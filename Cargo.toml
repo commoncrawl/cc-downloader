@@ -1,6 +1,6 @@
 [package]
 name = "cc-downloader"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 authors = ["Pedro Ortiz Suarez <pedro@commoncrawl.org>"]
 description = "A polite and user-friendly downloader for Common Crawl data."

@@ -7,7 +7,6 @@ This is an experimental polite downloader for Common Crawl data writter in `rust
 - [ ] Add Python bindings
 - [ ] Add tests
 - [ ] Handle unrecoverable errors
-- [ ] Crosscompile and release binaries
 
 ## Installation
 
