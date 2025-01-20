@@ -21,13 +21,13 @@ cargo install cc-downloader
 ## Usage
 
 ```text
-➜ cc-downloader -h                                                                               
+➜ cc-downloader -h
 A polite and user-friendly downloader for Common Crawl data.
 
 Usage: cc-downloader [COMMAND]
 
 Commands:
-  download-paths  Download paths for a given snapshot
+  download-paths  Download paths for a given crawl
   download        Download files from a crawl
   help            Print this message or the help of the given subcommand(s)
 
@@ -38,20 +38,20 @@ Options:
 ------
 
 ➜ cc-downloader download-paths -h
-Download paths for a given snapshot
+Download paths for a given crawl
 
-Usage: cc-downloader download-paths <SNAPSHOT> <PATHS> <DESTINATION>
+Usage: cc-downloader download-paths <CRAWL> <SUBSET> <DESTINATION>
 
 Arguments:
-  <SNAPSHOT>     Crawl reference, e.g. CC-MAIN-2021-04
-  <PATHS>        Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
+  <CRAWL>        Crawl reference, e.g. CC-MAIN-2021-04
+  <SUBSET>       Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
   <DESTINATION>  Destination folder
 
 Options:
   -h, --help  Print help
 ------
 
-➜ cc-downloader download -h      
+➜ cc-downloader download -h
 Download files from a crawl
 
 Usage: cc-downloader download [OPTIONS] <PATHS> <DESTINATION>
