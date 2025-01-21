@@ -11,14 +11,14 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Download paths for a given snapshot
+    /// Download paths for a given crawl
     DownloadPaths {
         /// Crawl reference, e.g. CC-MAIN-2021-04
-        #[arg(value_name = "SNAPSHOT")]
+        #[arg(value_name = "CRAWL")]
         snapshot: String,
 
         /// Data type
-        #[arg(value_name = "PATHS")]
+        #[arg(value_name = "SUBSET")]
         data_type: DataType,
 
         /// Destination folder
