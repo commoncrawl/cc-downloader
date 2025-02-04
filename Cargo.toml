@@ -25,3 +25,11 @@ reqwest-retry = "0.7.0"
 tokio = { version = "1.42.0", features = ["full"] }
 tokio-util = { version = "0.7.13", features = ["compat"] }
 url = "2.5.4"
+
+[dev-dependencies]
+serde = { version = "1.0.217", features = ["derive"] }
+reqwest = { version = "0.12.9", default-features = false, features = [
+    "stream",
+    "rustls-tls",
+    "json",
+] }
