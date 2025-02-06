@@ -21,6 +21,22 @@ use crate::errors::DownloadError;
 
 const BASE_URL: &str = "https://data.commoncrawl.org/";
 
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
+fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError> {
+    let retry_policy = ExponentialBackoff::builder()
+        .retry_bounds(Duration::from_secs(1), Duration::from_secs(3600))
+        .jitter(Jitter::Bounded)
+        .base(2)
+        .build_with_max_retries(u32::try_from(max_retries).unwrap());
+
+    let client_base = Client::builder().user_agent(APP_USER_AGENT).build()?;
+
+    Ok(ClientBuilder::new(client_base)
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build())
+}
+
 pub async fn download_paths(
     snapshot: &String,
     data_type: &str,
@@ -30,7 +46,7 @@ pub async fn download_paths(
     println!("Downloading paths from: {}", paths);
     let url = Url::parse(&paths)?;
 
-    let client = Client::new();
+    let client = new_client(1000)?;
 
     let filename = url
         .path_segments() // Splits into segments of the URL
@@ -227,15 +243,7 @@ pub async fn download(
         main_pb.tick();
     }
 
-    let retry_policy = ExponentialBackoff::builder()
-        .retry_bounds(Duration::from_secs(1), Duration::from_secs(3600))
-        .jitter(Jitter::Bounded)
-        .base(2)
-        .build_with_max_retries(u32::try_from(max_retries).unwrap());
-
-    let client = ClientBuilder::new(reqwest::Client::new())
-        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
-        .build();
+    let client = new_client(max_retries)?;
 
     let semaphore = Arc::new(Semaphore::new(threads));
     let mut set = JoinSet::new();
@@ -297,4 +305,34 @@ pub async fn download(
         println!("All downloads completed");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+    use std::collections::HashMap;
+
+    #[derive(Deserialize, Debug)]
+    pub struct HeadersEcho {
+        pub headers: HashMap<String, String>,
+    }
+
+    #[test]
+    fn user_agent_format() {
+        assert_eq!(
+            APP_USER_AGENT,
+            concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),)
+        );
+    }
+
+    #[tokio::test]
+    async fn user_agent_test() -> Result<(), DownloadError> {
+        let client = new_client(1000)?;
+        let response = client.get("http://httpbin.org/headers").send().await?;
+
+        let out: HeadersEcho = response.json().await?;
+        assert_eq!(out.headers["User-Agent"], APP_USER_AGENT);
+        Ok(())
+    }
 }
