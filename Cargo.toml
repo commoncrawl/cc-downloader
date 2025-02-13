@@ -12,23 +12,23 @@ repository = "https://github.com/commoncrawl/cc-downloader"
 documentation = "https://docs.rs/cc-downloader"
 
 [dependencies]
-clap = { version = "4.5.23", features = ["derive"] }
+clap = { version = "4.5.29", features = ["derive"] }
 flate2 = "1.0.35"
 futures = "0.3.31"
-indicatif = "0.17.9"
-reqwest = { version = "0.12.9", default-features = false, features = [
+indicatif = "0.17.11"
+reqwest = { version = "0.12.12", default-features = false, features = [
     "stream",
     "rustls-tls",
 ] }
 reqwest-middleware = "0.4.0"
 reqwest-retry = "0.7.0"
-tokio = { version = "1.42.0", features = ["full"] }
+tokio = { version = "1.43.0", features = ["full"] }
 tokio-util = { version = "0.7.13", features = ["compat"] }
 url = "2.5.4"
 
 [dev-dependencies]
 serde = { version = "1.0.217", features = ["derive"] }
-reqwest = { version = "0.12.9", default-features = false, features = [
+reqwest = { version = "0.12.12", default-features = false, features = [
     "stream",
     "rustls-tls",
     "json",

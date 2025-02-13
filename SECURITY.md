@@ -11,4 +11,4 @@ Only the latest minor version is being supported
 
 ## Reporting a Vulnerability
 
-To report a security vulnerability, please contact: info@commoncrawl.org
+To report a security vulnerability, please contact: info[at]commoncrawl[dot]org
