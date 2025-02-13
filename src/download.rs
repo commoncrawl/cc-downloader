@@ -8,7 +8,7 @@ use reqwest_retry::RetryTransientMiddleware;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::Arc;
 use std::time::Duration;
@@ -40,7 +40,7 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
 pub async fn download_paths(
     snapshot: &String,
     data_type: &str,
-    dst: &PathBuf,
+    dst: &Path,
 ) -> Result<(), DownloadError> {
     let paths = format!("{}crawl-data/{}/{}.paths.gz", BASE_URL, snapshot, data_type);
     println!("Downloading paths from: {}", paths);
@@ -55,7 +55,7 @@ pub async fn download_paths(
 
     let request = client.get(url.as_str());
 
-    let mut dst = dst.clone();
+    let mut dst = dst.to_path_buf();
 
     dst.push(filename);
 
@@ -65,7 +65,7 @@ pub async fn download_paths(
     let mut download = request.send().await?;
 
     while let Some(chunk) = download.chunk().await? {
-        outfile.write(&chunk).await?; // Write chunk to output file
+        outfile.write_all(&chunk).await?; // Write chunk to output file
     }
 
     outfile.flush().await?;
@@ -110,7 +110,7 @@ async fn download_task(
 
     // Parse the filename from the given URL
     let filename = if numbered {
-        &format!("{}{}", number.to_string(), ".txt.gz")
+        &format!("{}{}", number, ".txt.gz")
     } else if files_only {
         url.path_segments()
             .and_then(|segments| segments.last())
@@ -166,7 +166,7 @@ async fn download_task(
         if progress {
             progress_bar.inc(chunk.len() as u64); // Increase ProgressBar by chunk size
         }
-        outfile.write(&chunk).await?; // Write chunk to output file
+        outfile.write_all(&chunk).await?; // Write chunk to output file
     }
 
     if progress {
@@ -188,8 +188,8 @@ async fn download_task(
 }
 
 pub async fn download(
-    paths: &PathBuf,
-    dst: &PathBuf,
+    paths: &Path,
+    dst: &Path,
     threads: usize,
     max_retries: usize,
     numbered: bool,
@@ -253,11 +253,8 @@ pub async fn download(
         let multibar = multibar.clone();
         let main_pb = main_pb.clone();
         let client = client.clone();
-        let dst = dst.clone();
-        let numbered = numbered.clone();
-        let files_only = files_only.clone();
+        let dst = dst.to_path_buf();
         let semaphore = semaphore.clone();
-        let progress = progress.clone();
         set.spawn(async move {
             let _permit = semaphore.acquire().await;
             let res = download_task(
