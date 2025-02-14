@@ -1,4 +1,5 @@
 # How to contribute to cc-downloader?
+
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
 `cc-downloader` is an open source project, so all contributions and suggestions are welcome.
@@ -12,6 +13,7 @@ In order to facilitate healthy, constructive behavior in an open and inclusive c
 our [code of conduct](CODE_OF_CONDUCT.md).
 
 ## How to work on an open Issue?
+
 You have the list of open Issues at: [https://github.com/commoncrawl/cc-downloader/issues](https://github.com/commoncrawl/cc-downloader/issues)
 
 Some of them may have the label `help wanted`: that means that any contributor is welcomed!
@@ -36,13 +38,14 @@ If you would like to work on any of the open Issues:
     git remote add upstream git@github.com:commoncrawl/cc-downloader.git
     ```
 
-3. Create a new branch to hold your development changes:
+3. Switch to the `dev` branch and then create a new branch to hold your development changes:
 
     ```bash
+    git checkout dev
     git checkout -b a-descriptive-name-for-my-changes
     ```
 
-    **do not** work on the `main` branch.
+    **do not** work on the `main` or `dev` branches.
 
 4. Develop the features on your branch.
 
@@ -58,17 +61,16 @@ If you would like to work on any of the open Issues:
 
     ```bash
     git fetch upstream
-    git rebase upstream/main
+    git rebase upstream/dev
     ```
 
-9. Once you are satisfied, push the changes to your fork repo using:
+6. Once you are satisfied, push the changes to your fork repo using:
 
    ```bash
    git push -u origin a-descriptive-name-for-my-changes
    ```
 
-   Go the webpage of your fork on GitHub. Click on "Pull request" to send your to the project maintainers for review.
-
+   Go the webpage of your fork on GitHub. Click on "Pull request" to send your to the project maintainers for review, and select the `dev` branch as the brach you'd like to merge your changes into.
 
 Thank you for your contribution!
 
