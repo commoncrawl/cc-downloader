@@ -5,7 +5,7 @@ This is an experimental polite downloader for Common Crawl data writter in `rust
 ## Todo
 
 - [ ] Add Python bindings
-- [ ] Add tests
+- [ ] Add more tests
 - [ ] Handle unrecoverable errors
 
 ## Installation

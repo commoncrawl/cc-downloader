@@ -2,35 +2,87 @@ use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::{header, Client, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_retry::policies::ExponentialBackoff;
-use reqwest_retry::Jitter;
-use reqwest_retry::RetryTransientMiddleware;
-use std::fs::File;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::path::PathBuf;
-use std::process;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::io::AsyncWriteExt;
-use tokio::io::BufWriter;
-use tokio::sync::Semaphore;
-use tokio::task::JoinSet;
+use reqwest_retry::{policies::ExponentialBackoff, Jitter, RetryTransientMiddleware};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
+    process, str,
+    sync::Arc,
+    time::Duration,
+};
+use tokio::{
+    io::{AsyncWriteExt, BufWriter},
+    sync::Semaphore,
+    task::JoinSet,
+};
 
 use crate::errors::DownloadError;
 
 const BASE_URL: &str = "https://data.commoncrawl.org/";
 
-pub async fn download_paths(
-    snapshot: &String,
-    data_type: &str,
-    dst: &PathBuf,
-) -> Result<(), DownloadError> {
-    let paths = format!("{}crawl-data/{}/{}.paths.gz", BASE_URL, snapshot, data_type);
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
+pub struct DownloadOptions<'a> {
+    pub snapshot: String,
+    pub data_type: &'a str,
+    pub paths: &'a Path,
+    pub dst: &'a Path,
+    pub threads: usize,
+    pub max_retries: usize,
+    pub numbered: bool,
+    pub files_only: bool,
+    pub progress: bool,
+}
+
+pub struct TaskOptions {
+    pub number: usize,
+    pub path: String,
+    pub dst: PathBuf,
+    pub numbered: bool,
+    pub files_only: bool,
+    pub progress: bool,
+}
+
+impl Default for DownloadOptions<'_> {
+    fn default() -> Self {
+        DownloadOptions {
+            snapshot: "".to_string(),
+            data_type: "",
+            paths: Path::new(""),
+            dst: Path::new(""),
+            threads: 1,
+            max_retries: 1000,
+            numbered: false,
+            files_only: false,
+            progress: false,
+        }
+    }
+}
+
+fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError> {
+    let retry_policy = ExponentialBackoff::builder()
+        .retry_bounds(Duration::from_secs(1), Duration::from_secs(3600))
+        .jitter(Jitter::Bounded)
+        .base(2)
+        .build_with_max_retries(u32::try_from(max_retries).unwrap());
+
+    let client_base = Client::builder().user_agent(APP_USER_AGENT).build()?;
+
+    Ok(ClientBuilder::new(client_base)
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build())
+}
+
+pub async fn download_paths(options: DownloadOptions<'_>) -> Result<(), DownloadError> {
+    let paths = format!(
+        "{}crawl-data/{}/{}.paths.gz",
+        BASE_URL, options.snapshot, options.data_type
+    );
     println!("Downloading paths from: {}", paths);
     let url = Url::parse(&paths)?;
 
-    let client = Client::new();
+    let client = new_client(options.max_retries)?;
 
     let filename = url
         .path_segments() // Splits into segments of the URL
@@ -39,7 +91,7 @@ pub async fn download_paths(
 
     let request = client.get(url.as_str());
 
-    let mut dst = dst.clone();
+    let mut dst = options.dst.to_path_buf();
 
     dst.push(filename);
 
@@ -49,7 +101,7 @@ pub async fn download_paths(
     let mut download = request.send().await?;
 
     while let Some(chunk) = download.chunk().await? {
-        outfile.write(&chunk).await?; // Write chunk to output file
+        outfile.write_all(&chunk).await?; // Write chunk to output file
     }
 
     outfile.flush().await?;
@@ -63,16 +115,11 @@ pub async fn download_paths(
 
 async fn download_task(
     client: ClientWithMiddleware,
-    download_url: String,
-    number: usize,
     multibar: Arc<MultiProgress>,
-    dst: PathBuf,
-    numbered: bool,
-    files_only: bool,
-    progress: bool,
+    task_options: TaskOptions,
 ) -> Result<(), DownloadError> {
     // Parse URL into Url type
-    let url = Url::parse(&download_url)?;
+    let url = Url::parse(&task_options.path)?;
 
     // We need to determine the file size before we download, so we can create a ProgressBar
     // A Header request for the CONTENT_LENGTH header gets us the file size
@@ -93,9 +140,9 @@ async fn download_task(
     };
 
     // Parse the filename from the given URL
-    let filename = if numbered {
-        &format!("{}{}", number.to_string(), ".txt.gz")
-    } else if files_only {
+    let filename = if task_options.numbered {
+        &format!("{}{}", task_options.number, ".txt.gz")
+    } else if task_options.files_only {
         url.path_segments()
             .and_then(|segments| segments.last())
             .unwrap_or("file.download")
@@ -103,7 +150,7 @@ async fn download_task(
         url.path().strip_prefix("/").unwrap_or("file.download")
     };
 
-    let mut dst = dst.clone();
+    let mut dst = task_options.dst.clone();
 
     dst.push(filename);
 
@@ -114,7 +161,7 @@ async fn download_task(
     // and add it to the multibar
     let progress_bar = multibar.add(ProgressBar::new(download_size));
 
-    if progress {
+    if task_options.progress {
         // Set Style to the ProgressBar
         progress_bar.set_style(
             ProgressStyle::default_bar()
@@ -129,7 +176,7 @@ async fn download_task(
     }
 
     // Create the directory if it doesn't exist
-    if !numbered {
+    if !task_options.numbered {
         if let Some(parent) = dst.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
@@ -147,13 +194,13 @@ async fn download_task(
     // We use the part from the reqwest-tokio example here on purpose
     // This way, we are able to increase the ProgressBar with every downloaded chunk
     while let Some(chunk) = download.chunk().await? {
-        if progress {
+        if task_options.progress {
             progress_bar.inc(chunk.len() as u64); // Increase ProgressBar by chunk size
         }
-        outfile.write(&chunk).await?; // Write chunk to output file
+        outfile.write_all(&chunk).await?; // Write chunk to output file
     }
 
-    if progress {
+    if task_options.progress {
         // Finish the progress bar to prevent glitches
         progress_bar.finish();
 
@@ -171,22 +218,18 @@ async fn download_task(
     Ok(())
 }
 
-pub async fn download(
-    paths: &PathBuf,
-    dst: &PathBuf,
-    threads: usize,
-    max_retries: usize,
-    numbered: bool,
-    files_only: bool,
-    progress: bool,
-) -> Result<(), DownloadError> {
+pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     // A vector containing all the URLs to download
 
     let file = {
-        let gzip_file = match File::open(paths) {
+        let gzip_file = match File::open(options.paths) {
             Ok(file) => file,
             Err(e) => {
-                eprintln!("Could not open file {}\nError: {}", paths.display(), e);
+                eprintln!(
+                    "Could not open file {}\nError: {}",
+                    options.paths.display(),
+                    e
+                );
                 process::exit(1)
             }
         };
@@ -216,7 +259,7 @@ pub async fn download(
     );
 
     // Only set the style if we are showing progress
-    if progress {
+    if options.progress {
         main_pb.set_style(
             indicatif::ProgressStyle::default_bar().template("{msg} {bar:10} {pos}/{len}")?,
         );
@@ -227,17 +270,9 @@ pub async fn download(
         main_pb.tick();
     }
 
-    let retry_policy = ExponentialBackoff::builder()
-        .retry_bounds(Duration::from_secs(1), Duration::from_secs(3600))
-        .jitter(Jitter::Bounded)
-        .base(2)
-        .build_with_max_retries(u32::try_from(max_retries).unwrap());
+    let client = new_client(options.max_retries)?;
 
-    let client = ClientBuilder::new(reqwest::Client::new())
-        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
-        .build();
-
-    let semaphore = Arc::new(Semaphore::new(threads));
+    let semaphore = Arc::new(Semaphore::new(options.threads));
     let mut set = JoinSet::new();
 
     for (number, path) in paths {
@@ -245,18 +280,20 @@ pub async fn download(
         let multibar = multibar.clone();
         let main_pb = main_pb.clone();
         let client = client.clone();
-        let dst = dst.clone();
-        let numbered = numbered.clone();
-        let files_only = files_only.clone();
+        let dst = options.dst.to_path_buf();
         let semaphore = semaphore.clone();
-        let progress = progress.clone();
         set.spawn(async move {
             let _permit = semaphore.acquire().await;
-            let res = download_task(
-                client, path, number, multibar, dst, numbered, files_only, progress,
-            )
-            .await;
-            if progress {
+            let task_options = TaskOptions {
+                path,
+                number,
+                dst,
+                numbered: options.numbered,
+                files_only: options.files_only,
+                progress: options.progress,
+            };
+            let res = download_task(client, multibar, task_options).await;
+            if options.progress {
                 // Increment the main progress bar.
                 main_pb.inc(1);
             }
@@ -284,7 +321,7 @@ pub async fn download(
         }
     }
 
-    if progress {
+    if options.progress {
         // Change the message on the overall progress indicator.
         main_pb.finish_with_message("done");
 
@@ -297,4 +334,34 @@ pub async fn download(
         println!("All downloads completed");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+    use std::collections::HashMap;
+
+    #[derive(Deserialize, Debug)]
+    pub struct HeadersEcho {
+        pub headers: HashMap<String, String>,
+    }
+
+    #[test]
+    fn user_agent_format() {
+        assert_eq!(
+            APP_USER_AGENT,
+            concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),)
+        );
+    }
+
+    #[tokio::test]
+    async fn user_agent_test() -> Result<(), DownloadError> {
+        let client = new_client(1000)?;
+        let response = client.get("http://httpbin.org/headers").send().await?;
+
+        let out: HeadersEcho = response.json().await?;
+        assert_eq!(out.headers["User-Agent"], APP_USER_AGENT);
+        Ok(())
+    }
 }
