@@ -89,6 +89,23 @@ pub async fn download_paths(options: DownloadOptions<'_>) -> Result<(), Download
         .and_then(|segments| segments.last()) // Retrieves the last segment
         .unwrap_or("file.download"); // Fallback to generic filename
 
+    let resp = client.head(url.as_str()).send().await?;
+    match resp.status() {
+        status if status.is_success() => (),
+        status if status.is_client_error() => {
+            return Err(format!(
+                "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tSUBSET:{}\n\tULR: {}\n\nDoesn't seem to exist or it is not accessible.\n\tError Code: {:?}",
+                options.snapshot, options.data_type, url, status
+            )
+            .into());
+        }
+        _ => {
+            return Err(
+                format!("Couldn't download URL: {}. Error: {:?}", url, resp.status()).into(),
+            )
+        }
+    }
+
     let request = client.get(url.as_str());
 
     let mut dst = options.dst.to_path_buf();
@@ -134,7 +151,7 @@ async fn download_task(
         } else {
             // We return an Error if something goes wrong here
             return Err(
-                format!("Couldn't download URL: {}. Error: {:?}", url, resp.status(),).into(),
+                format!("Couldn't download URL: {}. Error: {:?}", url, resp.status()).into(),
             );
         }
     };
