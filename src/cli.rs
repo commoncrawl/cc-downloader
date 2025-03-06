@@ -91,8 +91,6 @@ impl DataType {
     }
 }
 
-//https://data.commoncrawl.org/crawl-data/CC-NEWS/2025/01/warc.paths.gz
-
 fn crawl_name_format(crawl: &str) -> Result<String, String> {
     let main_re = Regex::new(r"^(CC\-MAIN)\-([0-9]{4})\-([0-9]{2})$").unwrap();
     let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
