@@ -98,8 +98,8 @@ fn crawl_name_format(crawl: &str) -> Result<String, String> {
     let crawl_ref = crawl.to_uppercase();
 
     if !(main_re.is_match(&crawl_ref) || news_re.is_match(&crawl_ref)) {
-        return Err("Please use the CC-MAIN-YYYY-WW or the CC-NEWS-YYYY-MM format.".to_string());
+        Err("Please use the CC-MAIN-YYYY-WW or the CC-NEWS-YYYY-MM format.".to_string())
     } else {
-        return Ok(crawl_ref);
+        Ok(crawl_ref)
     }
 }
