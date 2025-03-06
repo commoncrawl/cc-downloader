@@ -95,9 +95,11 @@ fn crawl_name_format(crawl: &str) -> Result<String, String> {
     let main_re = Regex::new(r"^(CC\-MAIN)\-([0-9]{4})\-([0-9]{2})$").unwrap();
     let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
 
-    if !(main_re.is_match(crawl) || news_re.is_match(crawl)) {
-        return Err("Please use the CC-MAIN-YYYY-WW or the CC-NEWS-YYYY-MM format, make sure your input is propely capitalized".to_string());
+    let crawl_ref = crawl.to_uppercase();
+
+    if !(main_re.is_match(&crawl_ref) || news_re.is_match(&crawl_ref)) {
+        return Err("Please use the CC-MAIN-YYYY-WW or the CC-NEWS-YYYY-MM format.".to_string());
     } else {
-        return Ok(crawl.to_owned());
+        return Ok(crawl_ref);
     }
 }

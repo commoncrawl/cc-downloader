@@ -104,17 +104,21 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
     let resp = client.head(url.as_str()).send().await?;
     match resp.status() {
         status if status.is_success() => (),
-        status if status.is_client_error() => {
+        status if status.as_u16() == 404 => {
             return Err(format!(
-                "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tSUBSET: {}\n\tURL: {}\n\nDoesn't seem to exist or it is currently not accessible.\n\tError Code: {} {}",
+                "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tSUBSET: {}\n\tURL: {}\n\nDoesn't seem to exist or it is currently not accessible.\n\tError code: {} {}",
                 snapshot_original_ref, options.data_type, url, status.as_str(), status.canonical_reason().unwrap_or("")
             )
             .into());
         }
-        _ => {
-            return Err(
-                format!("Couldn't download URL: {}. Error: {:?}", url, resp.status()).into(),
-            );
+        status => {
+            return Err(format!(
+                "Couldn't download URL: {}. Error code: {} {}",
+                url,
+                status.as_str(),
+                status.canonical_reason().unwrap_or("")
+            )
+            .into());
         }
     }
 
