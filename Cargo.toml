@@ -1,33 +1,34 @@
 [package]
 name = "cc-downloader"
 version = "0.5.2"
-edition = "2021"
+edition = "2024"
 authors = ["Pedro Ortiz Suarez <pedro@commoncrawl.org>"]
 description = "A polite and user-friendly downloader for Common Crawl data."
 license = "MIT OR Apache-2.0"
-rust-version = "1.83"
+rust-version = "1.85"
 readme = "README.md"
 homepage = "https://commoncrawl.org"
 repository = "https://github.com/commoncrawl/cc-downloader"
 documentation = "https://docs.rs/cc-downloader"
 
 [dependencies]
-clap = { version = "4.5.29", features = ["derive"] }
-flate2 = "1.0.35"
+clap = { version = "4.5.31", features = ["derive"] }
+flate2 = "1.1.0"
 futures = "0.3.31"
 indicatif = "0.17.11"
+regex = "1.11.1"
 reqwest = { version = "0.12.12", default-features = false, features = [
     "stream",
     "rustls-tls",
 ] }
-reqwest-middleware = "0.4.0"
+reqwest-middleware = "0.4.1"
 reqwest-retry = "0.7.0"
 tokio = { version = "1.43.0", features = ["full"] }
 tokio-util = { version = "0.7.13", features = ["compat"] }
 url = "2.5.4"
 
 [dev-dependencies]
-serde = { version = "1.0.217", features = ["derive"] }
+serde = { version = "1.0.218", features = ["derive"] }
 reqwest = { version = "0.12.12", default-features = false, features = [
     "stream",
     "rustls-tls",
