@@ -1,10 +1,9 @@
 use clap::Parser;
 
 use crate::cli::Commands;
+use cc_downloader::download;
 
 mod cli;
-mod download;
-mod errors;
 
 #[tokio::main]
 async fn main() {
