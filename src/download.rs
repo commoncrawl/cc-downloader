@@ -1,8 +1,9 @@
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use reqwest::{header, Client, Url};
+use regex::Regex;
+use reqwest::{Client, Url, header};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_retry::{policies::ExponentialBackoff, Jitter, RetryTransientMiddleware};
+use reqwest_retry::{Jitter, RetryTransientMiddleware, policies::ExponentialBackoff};
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -74,7 +75,18 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
         .build())
 }
 
-pub async fn download_paths(options: DownloadOptions<'_>) -> Result<(), DownloadError> {
+pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), DownloadError> {
+    let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
+
+    // Check if the snapshot is a news snapshot and reformat it
+    // The format of the main crawl urls is different from the news crawl urls
+    // https://data.commoncrawl.org/crawl-data/CC-NEWS/2025/01/warc.paths.gz
+    // https://data.commoncrawl.org/crawl-data/CC-MAIN-2025-08/warc.paths.gz
+    let snapshot_original_ref = options.snapshot.clone();
+    if news_re.is_match(&options.snapshot) {
+        let caps = news_re.captures(&options.snapshot).unwrap();
+        options.snapshot = format!("{}/{}/{}", &caps[1], &caps[2], &caps[3]);
+    }
     let paths = format!(
         "{}crawl-data/{}/{}.paths.gz",
         BASE_URL, options.snapshot, options.data_type
@@ -88,6 +100,27 @@ pub async fn download_paths(options: DownloadOptions<'_>) -> Result<(), Download
         .path_segments() // Splits into segments of the URL
         .and_then(|segments| segments.last()) // Retrieves the last segment
         .unwrap_or("file.download"); // Fallback to generic filename
+
+    let resp = client.head(url.as_str()).send().await?;
+    match resp.status() {
+        status if status.is_success() => (),
+        status if status.as_u16() == 404 => {
+            return Err(format!(
+                "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tSUBSET: {}\n\tURL: {}\n\nDoesn't seem to exist or it is currently not accessible.\n\tError code: {} {}",
+                snapshot_original_ref, options.data_type, url, status.as_str(), status.canonical_reason().unwrap_or("")
+            )
+            .into());
+        }
+        status => {
+            return Err(format!(
+                "Couldn't download URL: {}. Error code: {} {}",
+                url,
+                status.as_str(),
+                status.canonical_reason().unwrap_or("")
+            )
+            .into());
+        }
+    }
 
     let request = client.get(url.as_str());
 
@@ -134,7 +167,7 @@ async fn download_task(
         } else {
             // We return an Error if something goes wrong here
             return Err(
-                format!("Couldn't download URL: {}. Error: {:?}", url, resp.status(),).into(),
+                format!("Couldn't download URL: {}. Error: {:?}", url, resp.status()).into(),
             );
         }
     };

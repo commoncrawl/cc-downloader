@@ -43,7 +43,7 @@ Download paths for a given crawl
 Usage: cc-downloader download-paths <CRAWL> <SUBSET> <DESTINATION>
 
 Arguments:
-  <CRAWL>        Crawl reference, e.g. CC-MAIN-2021-04
+  <CRAWL>        Crawl reference, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
   <SUBSET>       Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
   <DESTINATION>  Destination folder
 
