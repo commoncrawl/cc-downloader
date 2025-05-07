@@ -2,7 +2,7 @@
 
 This is an experimental polite downloader for Common Crawl data written in `rust`. This tool is intended for use outside of AWS.
 
-## Todo
+## To-do
 
 - [ ] Add Python bindings
 - [ ] Add more tests
@@ -39,7 +39,7 @@ For `zip` files you can use the following command:
 unzip cc-downloader-[VERSION]-[ARCH]-[OS].zip
 ```
 
-This will extract the binary, the licenses and the readme file **in the current folder**. After extracting the binary, you can run it by executing the following command:
+This will extract the binary, the licenses and the `README.md` file **in the current folder**. After extracting the binary, you can run it by executing the following command:
 
 ```bash
 ./cc-downloader
@@ -63,7 +63,7 @@ then run the following command to apply the changes:
 source ~/.bashrc
 ```
 
-or 
+or
 
 ```bash
 source ~/.zshrc

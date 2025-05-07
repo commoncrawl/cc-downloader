@@ -1,9 +1,9 @@
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
-use reqwest::{Client, Url, header};
+use reqwest::{header, Client, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_retry::{Jitter, RetryTransientMiddleware, policies::ExponentialBackoff};
+use reqwest_retry::{policies::ExponentialBackoff, Jitter, RetryTransientMiddleware};
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -36,7 +36,7 @@ pub struct DownloadOptions<'a> {
     pub progress: bool,
 }
 
-pub struct TaskOptions {
+struct TaskOptions {
     pub number: usize,
     pub path: String,
     pub dst: PathBuf,
@@ -57,6 +57,32 @@ impl Default for DownloadOptions<'_> {
             numbered: false,
             files_only: false,
             progress: false,
+        }
+    }
+}
+
+impl<'a> DownloadOptions<'a> {
+    pub fn new(
+        snapshot: String,
+        data_type: &'a str,
+        paths: &'a Path,
+        dst: &'a Path,
+        threads: usize,
+        max_retries: usize,
+        numbered: bool,
+        files_only: bool,
+        progress: bool,
+    ) -> Self {
+        DownloadOptions {
+            snapshot,
+            data_type,
+            paths,
+            dst,
+            threads,
+            max_retries,
+            numbered,
+            files_only,
+            progress,
         }
     }
 }
@@ -98,7 +124,7 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
 
     let filename = url
         .path_segments() // Splits into segments of the URL
-        .and_then(|segments| segments.last()) // Retrieves the last segment
+        .and_then(|mut segments| segments.next_back()) // Retrieves the last segment
         .unwrap_or("file.download"); // Fallback to generic filename
 
     let resp = client.head(url.as_str()).send().await?;
@@ -177,7 +203,7 @@ async fn download_task(
         &format!("{}{}", task_options.number, ".txt.gz")
     } else if task_options.files_only {
         url.path_segments()
-            .and_then(|segments| segments.last())
+            .and_then(|mut segments| segments.next_back())
             .unwrap_or("file.download")
     } else {
         url.path().strip_prefix("/").unwrap_or("file.download")
