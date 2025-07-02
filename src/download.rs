@@ -63,27 +63,45 @@ impl Default for DownloadOptions<'_> {
 
 impl<'a> DownloadOptions<'a> {
     pub fn new(
-        snapshot: String,
+        snapshot: &'a str,
         data_type: &'a str,
-        paths: &'a Path,
-        dst: &'a Path,
+        paths: &'a str,
+        dst: &'a str,
         threads: usize,
         max_retries: usize,
         numbered: bool,
         files_only: bool,
         progress: bool,
     ) -> Self {
+        // Validate the snapshot format
+        let snapshot = crawl_name_format(snapshot).unwrap_or_else(|err| {
+            eprintln!("Error: {}", err);
+            process::exit(1);
+        });
         DownloadOptions {
-            snapshot,
+            snapshot: snapshot,
             data_type,
-            paths,
-            dst,
+            paths: Path::new(paths),
+            dst: Path::new(dst),
             threads,
             max_retries,
             numbered,
             files_only,
             progress,
         }
+    }
+}
+
+fn crawl_name_format(crawl: &str) -> Result<String, String> {
+    let main_re = Regex::new(r"^(CC\-MAIN)\-([0-9]{4})\-([0-9]{2})$").unwrap();
+    let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
+
+    let crawl_ref = crawl.to_uppercase();
+
+    if !(main_re.is_match(&crawl_ref) || news_re.is_match(&crawl_ref)) {
+        Err("Please use the CC-MAIN-YYYY-WW or the CC-NEWS-YYYY-MM format.".to_string())
+    } else {
+        Ok(crawl_ref)
     }
 }
 
