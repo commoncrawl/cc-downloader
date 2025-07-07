@@ -24,6 +24,7 @@ const BASE_URL: &str = "https://data.commoncrawl.org/";
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
+/// Options for downloading paths or files from Common Crawl.
 pub struct DownloadOptions<'a> {
     pub snapshot: String,
     pub data_type: &'a str,
@@ -62,6 +63,7 @@ impl Default for DownloadOptions<'_> {
 }
 
 impl<'a> DownloadOptions<'a> {
+    /// Creates a new `DownloadOptions` instance with the provided parameters.
     pub fn new(
         snapshot: &'a str,
         data_type: &'a str,
@@ -75,11 +77,11 @@ impl<'a> DownloadOptions<'a> {
     ) -> Self {
         // Validate the snapshot format
         let snapshot = crawl_name_format(snapshot).unwrap_or_else(|err| {
-            eprintln!("Error: {}", err);
+            eprintln!("Error: {err}");
             process::exit(1);
         });
         DownloadOptions {
-            snapshot: snapshot,
+            snapshot,
             data_type,
             paths: Path::new(paths),
             dst: Path::new(dst),
@@ -119,6 +121,7 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
         .build())
 }
 
+/// Downloads the paths file for a specific Common Crawl snapshot and data type.
 pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
 
@@ -135,7 +138,7 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
         "{}crawl-data/{}/{}.paths.gz",
         BASE_URL, options.snapshot, options.data_type
     );
-    println!("Downloading paths from: {}", paths);
+    println!("Downloading paths from: {paths}");
     let url = Url::parse(&paths)?;
 
     let client = new_client(options.max_retries)?;
@@ -295,6 +298,7 @@ async fn download_task(
     Ok(())
 }
 
+/// Downloads files from Common Crawl based on the provided options (including the paths file).
 pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     // A vector containing all the URLs to download
 
@@ -318,7 +322,7 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
         .lines()
         .map(|line| {
             let line = line.unwrap();
-            format!("{}{}", BASE_URL, line)
+            format!("{BASE_URL}{line}")
         })
         .enumerate()
         .collect();
@@ -393,8 +397,8 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
     while let Some(result) = set.join_next().await {
         match result {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("Error: {:?}", e),
-            Err(e) => eprintln!("Error: {:?}", e),
+            Ok(Err(e)) => eprintln!("Error: {e:?}"),
+            Err(e) => eprintln!("Error: {e:?}"),
         }
     }
 

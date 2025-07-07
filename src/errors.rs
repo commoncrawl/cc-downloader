@@ -1,6 +1,7 @@
 use std::fmt;
 
 #[derive(Debug)]
+/// An error type for the download process, encapsulating various error sources.
 pub enum DownloadError {
     Reqwest(reqwest::Error),
     ReqwestMiddleware(reqwest_middleware::Error),

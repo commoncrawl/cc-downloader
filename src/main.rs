@@ -24,7 +24,7 @@ async fn main() {
             match download::download_paths(options).await {
                 Ok(_) => (),
                 Err(e) => {
-                    eprintln!("Error downloading paths: {}", e);
+                    eprintln!("Error downloading paths: {e}");
                 }
             };
         }
@@ -53,7 +53,7 @@ async fn main() {
                 match download::download(options).await {
                     Ok(_) => (),
                     Err(e) => {
-                        eprintln!("Error downloading paths: {}", e);
+                        eprintln!("Error downloading paths: {e}");
                     }
                 };
             }
