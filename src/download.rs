@@ -25,6 +25,7 @@ const BASE_URL: &str = "https://data.commoncrawl.org/";
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 /// Options for downloading paths or files from Common Crawl.
+#[derive(Clone, Debug)]
 pub struct DownloadOptions<'a> {
     pub snapshot: String,
     pub data_type: &'a str,
