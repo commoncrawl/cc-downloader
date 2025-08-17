@@ -70,8 +70,6 @@ impl<'a> DownloadOptions<'a> {
         data_type: &'a str,
         paths: &'a str,
         dst: &'a str,
-        threads: usize,
-        max_retries: usize,
         numbered: bool,
         files_only: bool,
         progress: bool,
@@ -86,12 +84,18 @@ impl<'a> DownloadOptions<'a> {
             data_type,
             paths: Path::new(paths),
             dst: Path::new(dst),
-            threads,
-            max_retries,
+            threads: 10,
+            max_retries: 1000,
             numbered,
             files_only,
             progress,
         }
+    }
+    pub fn set_threads(&mut self, threads: usize) {
+        self.threads = threads;
+    }
+    pub fn set_max_retries(&mut self, max_retries: usize) {
+        self.max_retries = max_retries;
     }
 }
 
