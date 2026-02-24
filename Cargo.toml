@@ -5,7 +5,7 @@
     authors = ["Pedro Ortiz Suarez <pedro@commoncrawl.org>"]
     description = "A polite and user-friendly downloader for Common Crawl data."
     license = "MIT OR Apache-2.0"
-    rust-version = "1.93.1"
+    rust-version = "1.93"
     readme = "README.md"
     homepage = "https://commoncrawl.org"
     repository = "https://github.com/commoncrawl/cc-downloader"
