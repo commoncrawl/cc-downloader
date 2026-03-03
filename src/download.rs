@@ -1,9 +1,9 @@
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
-use reqwest::{Client, Url, header};
+use reqwest::{header, Client, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_retry::{Jitter, RetryTransientMiddleware, policies::ExponentialBackoff};
+use reqwest_retry::{policies::ExponentialBackoff, Jitter, RetryTransientMiddleware};
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -24,6 +24,8 @@ const BASE_URL: &str = "https://data.commoncrawl.org/";
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
+/// Options for downloading paths or files from Common Crawl.
+#[derive(Clone, Debug)]
 pub struct DownloadOptions<'a> {
     pub snapshot: String,
     pub data_type: &'a str,
@@ -36,7 +38,7 @@ pub struct DownloadOptions<'a> {
     pub progress: bool,
 }
 
-pub struct TaskOptions {
+struct TaskOptions {
     pub number: usize,
     pub path: String,
     pub dst: PathBuf,
@@ -61,6 +63,55 @@ impl Default for DownloadOptions<'_> {
     }
 }
 
+impl<'a> DownloadOptions<'a> {
+    /// Creates a new `DownloadOptions` instance with the provided parameters.
+    pub fn new(
+        snapshot: &'a str,
+        data_type: &'a str,
+        paths: &'a str,
+        dst: &'a str,
+        numbered: bool,
+        files_only: bool,
+        progress: bool,
+    ) -> Self {
+        // Validate the snapshot format
+        let snapshot = crawl_name_format(snapshot).unwrap_or_else(|err| {
+            eprintln!("Error: {err}");
+            process::exit(1);
+        });
+        DownloadOptions {
+            snapshot,
+            data_type,
+            paths: Path::new(paths),
+            dst: Path::new(dst),
+            threads: 10,
+            max_retries: 1000,
+            numbered,
+            files_only,
+            progress,
+        }
+    }
+    pub fn set_threads(&mut self, threads: usize) {
+        self.threads = threads;
+    }
+    pub fn set_max_retries(&mut self, max_retries: usize) {
+        self.max_retries = max_retries;
+    }
+}
+
+fn crawl_name_format(crawl: &str) -> Result<String, String> {
+    let main_re = Regex::new(r"^(CC\-MAIN)\-([0-9]{4})\-([0-9]{2})$").unwrap();
+    let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
+
+    let crawl_ref = crawl.to_uppercase();
+
+    if !(main_re.is_match(&crawl_ref) || news_re.is_match(&crawl_ref)) {
+        Err("Please use the CC-MAIN-YYYY-WW or the CC-NEWS-YYYY-MM format.".to_string())
+    } else {
+        Ok(crawl_ref)
+    }
+}
+
 fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError> {
     let retry_policy = ExponentialBackoff::builder()
         .retry_bounds(Duration::from_secs(1), Duration::from_secs(3600))
@@ -75,6 +126,7 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
         .build())
 }
 
+/// Downloads the paths file for a specific Common Crawl snapshot and data type.
 pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
 
@@ -91,14 +143,14 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
         "{}crawl-data/{}/{}.paths.gz",
         BASE_URL, options.snapshot, options.data_type
     );
-    println!("Downloading paths from: {}", paths);
+    println!("Downloading paths from: {paths}");
     let url = Url::parse(&paths)?;
 
     let client = new_client(options.max_retries)?;
 
     let filename = url
         .path_segments() // Splits into segments of the URL
-        .and_then(|segments| segments.last()) // Retrieves the last segment
+        .and_then(|mut segments| segments.next_back()) // Retrieves the last segment
         .unwrap_or("file.download"); // Fallback to generic filename
 
     let resp = client.head(url.as_str()).send().await?;
@@ -177,7 +229,7 @@ async fn download_task(
         &format!("{}{}", task_options.number, ".txt.gz")
     } else if task_options.files_only {
         url.path_segments()
-            .and_then(|segments| segments.last())
+            .and_then(|mut segments| segments.next_back())
             .unwrap_or("file.download")
     } else {
         url.path().strip_prefix("/").unwrap_or("file.download")
@@ -251,6 +303,7 @@ async fn download_task(
     Ok(())
 }
 
+/// Downloads files from Common Crawl based on the provided options (including the paths file).
 pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     // A vector containing all the URLs to download
 
@@ -274,7 +327,7 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
         .lines()
         .map(|line| {
             let line = line.unwrap();
-            format!("{}{}", BASE_URL, line)
+            format!("{BASE_URL}{line}")
         })
         .enumerate()
         .collect();
@@ -349,8 +402,8 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
     while let Some(result) = set.join_next().await {
         match result {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("Error: {:?}", e),
-            Err(e) => eprintln!("Error: {:?}", e),
+            Ok(Err(e)) => eprintln!("Error: {e:?}"),
+            Err(e) => eprintln!("Error: {e:?}"),
         }
     }
 
