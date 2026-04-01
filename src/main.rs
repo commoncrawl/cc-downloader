@@ -1,10 +1,9 @@
 use clap::Parser;
 
 use crate::cli::Commands;
+use cc_downloader::download;
 
 mod cli;
-mod download;
-mod errors;
 
 #[tokio::main]
 async fn main() {
@@ -25,7 +24,7 @@ async fn main() {
             match download::download_paths(options).await {
                 Ok(_) => (),
                 Err(e) => {
-                    eprintln!("Error downloading paths: {}", e);
+                    eprintln!("Error downloading paths: {e}");
                 }
             };
         }
@@ -54,7 +53,7 @@ async fn main() {
                 match download::download(options).await {
                     Ok(_) => (),
                     Err(e) => {
-                        eprintln!("Error downloading paths: {}", e);
+                        eprintln!("Error downloading paths: {e}");
                     }
                 };
             }
