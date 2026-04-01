@@ -2,6 +2,7 @@ use clap::Parser;
 
 use crate::cli::Commands;
 use cc_downloader::download;
+use clap::CommandFactory;
 
 mod cli;
 
@@ -60,6 +61,7 @@ async fn main() {
         }
         None => {
             eprintln!("No command specified");
+            cli::Cli::command().print_help().unwrap();
         }
     }
 }
