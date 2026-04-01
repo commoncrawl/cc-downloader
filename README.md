@@ -1,12 +1,37 @@
 # CC-Downloader
 
-This is an experimental polite downloader for Common Crawl data written in `rust`. This tool is intended for use outside of AWS.
+A polite and user-friendly command-line tool for downloading [Common Crawl](https://commoncrawl.org) data, written in Rust.
 
-## To-do
+Common Crawl has seen a significant increase in data downloads in recent months, which has made it difficult for some users to successfully retrieve data from the storage bucket. CC-Downloader was built to address this: it implements a polite retry mechanism with exponential backoff and jitter to avoid overwhelming the infrastructure, while ensuring that every requested file is downloaded successfully.
 
-- [ ] Add Python bindings
-- [ ] Add more tests
-- [ ] Handle unrecoverable errors
+Key features:
+
+- **Polite retry with exponential backoff and jitter** -- prevents synchronized request patterns and gradually increases wait times between retries
+- **Concurrent downloads** -- processes multiple files simultaneously (default: 10 threads)
+- **Folder structure preservation** -- maintains the internal tree structure of Common Crawl data by default
+- **Cross-platform** -- pre-compiled binaries for Linux, macOS, and Windows
+
+This tool is intended for use outside of AWS. You can monitor Common Crawl infrastructure traffic on the [Infrastructure Status Webpage](https://commoncrawl.org/status).
+
+## Quick Start
+
+Install via cargo:
+
+```bash
+cargo install cc-downloader
+```
+
+The workflow has two steps. First, download the file paths for a given crawl and data type:
+
+```bash
+cc-downloader download-paths CC-MAIN-2024-46 wet path/to/folder
+```
+
+This produces a `wet.paths.gz` file. Then, download the actual data:
+
+```bash
+cc-downloader download path/to/folder/wet.paths.gz path/to/folder
+```
 
 ## Installation
 
@@ -149,3 +174,13 @@ Options:
 ## Number of threads
 
 The number of threads can be set using the `-t` flag. The default value is 10. It is advised to use the default value to avoid being blocked by the server. If you make too many requests in a short period of time, you will start receiving `403` errors which are unrecoverable and cannot be retried by the downloader.
+
+## Contributing
+
+Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get involved.
+
+## Todo
+
+- [ ] Add Python bindings
+- [ ] Add more tests
+- [ ] Handle unrecoverable errors
