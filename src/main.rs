@@ -42,11 +42,11 @@ async fn main() {
                 let options = download::DownloadOptions {
                     paths: &path_file,
                     dst: &dst,
-                    progress: progress,
-                    threads: threads,
+                    progress,
+                    threads,
                     max_retries: retries,
-                    numbered: numbered,
-                    files_only: files_only,
+                    numbered,
+                    files_only,
                     ..Default::default()
                 };
                 match download::download(options).await {

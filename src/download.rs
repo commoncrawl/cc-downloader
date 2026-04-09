@@ -1,9 +1,9 @@
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
-use reqwest::{header, Client, Url};
+use reqwest::{Client, Url, header};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_retry::{policies::ExponentialBackoff, Jitter, RetryTransientMiddleware};
+use reqwest_retry::{Jitter, RetryTransientMiddleware, policies::ExponentialBackoff};
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -180,6 +180,13 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
 
     dst.push(filename);
 
+    if let Some(parent) = dst.parent()
+        && !parent.exists()
+    {
+        println!("Creating directory: {}", parent.to_str().unwrap());
+        tokio::fs::create_dir_all(parent).await?;
+    }
+
     let outfile = tokio::fs::File::create(dst.clone()).await?;
     let mut outfile = BufWriter::new(outfile);
 
@@ -261,10 +268,10 @@ async fn download_task(
     }
 
     // Create the directory if it doesn't exist
-    if !task_options.numbered {
-        if let Some(parent) = dst.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
+    if !task_options.numbered
+        && let Some(parent) = dst.parent()
+    {
+        tokio::fs::create_dir_all(parent).await?;
     }
 
     // Create the output file with tokio's async fs lib
