@@ -13,21 +13,28 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Download paths for a given crawl
+    #[command(arg_required_else_help = true)]
     DownloadPaths {
         /// Crawl reference, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
         #[arg(value_name = "CRAWL", value_parser = crawl_name_format)]
         snapshot: String,
 
         /// Data type
-        #[arg(value_name = "SUBSET")]
+        #[arg(value_name = "DATA TYPE")]
         data_type: DataType,
 
         /// Destination folder
         #[arg(value_name = "DESTINATION")]
         dst: PathBuf,
+
+        /// Subsets to download (only valid for cc-index-table).
+        /// Defaults to all three if omitted.
+        #[arg(long = "subset", value_enum, num_args = 1..)]
+        subsets: Vec<CcIndexTableSubset>,
     },
 
     /// Download files from a crawl
+    #[command(arg_required_else_help = true)]
     Download {
         /// Path file
         #[arg(value_name = "PATHS")]
@@ -87,6 +94,23 @@ impl DataType {
             DataType::Non200responses => "non200responses",
             DataType::CcIndex => "cc-index",
             DataType::CcIndexTable => "cc-index-table",
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum CcIndexTableSubset {
+    Crawldiagnostics,
+    Robotstxt,
+    Warc,
+}
+
+impl CcIndexTableSubset {
+    pub fn as_str(&self) -> &str {
+        match self {
+            CcIndexTableSubset::Crawldiagnostics => "crawldiagnostics",
+            CcIndexTableSubset::Robotstxt => "robotstxt",
+            CcIndexTableSubset::Warc => "warc",
         }
     }
 }

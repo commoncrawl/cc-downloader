@@ -1,4 +1,4 @@
-use flate2::read::GzDecoder;
+use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
 use reqwest::{Client, Url, header};
@@ -6,7 +6,7 @@ use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{Jitter, RetryTransientMiddleware, policies::ExponentialBackoff};
 use std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process, str,
     sync::Arc,
@@ -36,6 +36,7 @@ pub struct DownloadOptions<'a> {
     pub numbered: bool,
     pub files_only: bool,
     pub progress: bool,
+    pub cc_index_table_subsets: Vec<String>,
 }
 
 struct TaskOptions {
@@ -59,6 +60,7 @@ impl Default for DownloadOptions<'_> {
             numbered: false,
             files_only: false,
             progress: false,
+            cc_index_table_subsets: Vec::new(),
         }
     }
 }
@@ -89,6 +91,7 @@ impl<'a> DownloadOptions<'a> {
             numbered,
             files_only,
             progress,
+            cc_index_table_subsets: Vec::new(),
         }
     }
     pub fn set_threads(&mut self, threads: usize) {
@@ -97,6 +100,45 @@ impl<'a> DownloadOptions<'a> {
     pub fn set_max_retries(&mut self, max_retries: usize) {
         self.max_retries = max_retries;
     }
+}
+
+fn filter_cc_index_table_paths(path: &Path, subsets: &[String]) -> Result<(), DownloadError> {
+    // Read and decompress the downloaded paths file
+    let file = File::open(path)?;
+    let decoder = GzDecoder::new(file);
+    let reader = BufReader::new(decoder);
+
+    // Keep only lines that match one of the requested subsets.
+    // Each line looks like:
+    //   cc-index/table/cc-main/warc/crawl=CC-MAIN-2026-08/subset=crawldiagnostics/part-...
+    // so a simple `contains("subset=<name>")` is sufficient.
+    let filtered: Vec<String> = reader
+        .lines()
+        .filter_map(|line| {
+            let line = line.ok()?;
+            let keep = subsets
+                .iter()
+                .any(|s| line.contains(&format!("subset={s}")));
+            if keep { Some(line) } else { None }
+        })
+        .collect();
+
+    println!(
+        "Filtered to {} paths ({} subsets requested)",
+        filtered.len(),
+        subsets.len()
+    );
+
+    // Overwrite the same file with the filtered + re-compressed content
+    let out = File::create(path)?;
+    let mut encoder = GzEncoder::new(out, Compression::default());
+    for line in &filtered {
+        encoder.write_all(line.as_bytes())?;
+        encoder.write_all(b"\n")?;
+    }
+    encoder.finish()?;
+
+    Ok(())
 }
 
 fn crawl_name_format(crawl: &str) -> Result<String, String> {
@@ -197,6 +239,11 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
     }
 
     outfile.flush().await?;
+
+    // Filter the downloaded paths file if subset filtering was requested
+    if options.data_type == "cc-index-table" && !options.cc_index_table_subsets.is_empty() {
+        filter_cc_index_table_paths(&dst, &options.cc_index_table_subsets)?;
+    }
 
     println!("Downloaded paths to: {}", dst.to_str().unwrap());
 
