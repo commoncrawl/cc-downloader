@@ -168,6 +168,59 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
         .build())
 }
 
+/// Downloads a paths file directly from a contributor dataset URL.
+pub async fn download_contrib_paths(
+    url: &str,
+    dst: &Path,
+    max_retries: usize,
+) -> Result<(), DownloadError> {
+    let url = Url::parse(url)?;
+    let client = new_client(max_retries)?;
+
+    let filename = url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .unwrap_or("file.download");
+
+    println!("Downloading contrib paths from: {url}");
+
+    let resp = client.head(url.as_str()).send().await?;
+    match resp.status() {
+        status if status.is_success() => (),
+        status => {
+            return Err(format!(
+                "Couldn't download URL: {}. Error code: {} {}",
+                url,
+                status.as_str(),
+                status.canonical_reason().unwrap_or("")
+            )
+            .into());
+        }
+    }
+
+    let mut dst = dst.to_path_buf();
+    dst.push(filename);
+
+    if let Some(parent) = dst.parent()
+        && !parent.exists()
+    {
+        println!("Creating directory: {}", parent.to_str().unwrap());
+        tokio::fs::create_dir_all(parent).await?;
+    }
+
+    let outfile = tokio::fs::File::create(dst.clone()).await?;
+    let mut outfile = BufWriter::new(outfile);
+
+    let mut download = client.get(url.as_str()).send().await?;
+    while let Some(chunk) = download.chunk().await? {
+        outfile.write_all(&chunk).await?;
+    }
+    outfile.flush().await?;
+
+    println!("Downloaded contrib paths to: {}", dst.to_str().unwrap());
+    Ok(())
+}
+
 /// Downloads the paths file for a specific Common Crawl snapshot and data type.
 pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
