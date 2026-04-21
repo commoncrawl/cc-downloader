@@ -24,13 +24,25 @@ cargo install cc-downloader
 The workflow has two steps. First, download the file paths for a given crawl and data type:
 
 ```bash
-cc-downloader download-paths CC-MAIN-2024-46 wet path/to/folder
+cc-downloader download-paths crawl CC-MAIN-2024-46 wet path/to/folder
 ```
 
 This produces a `wet.paths.gz` file. Then, download the actual data:
 
 ```bash
 cc-downloader download path/to/folder/wet.paths.gz path/to/folder
+```
+
+For `cc-index-table` data you can optionally filter to one or more subsets (`crawldiagnostics`, `robotstxt`, `warc`). Without `--subset` all three are downloaded:
+
+```bash
+cc-downloader download-paths crawl CC-MAIN-2024-46 cc-index-table path/to/folder --subset warc robotstxt
+```
+
+To download paths from a [contributor dataset](https://data.commoncrawl.org/contrib/index.html), use the `contrib` subcommand with the direct URL to the paths file:
+
+```bash
+cc-downloader download-paths contrib https://data.commoncrawl.org/contrib/<dataset>/paths.gz path/to/folder
 ```
 
 ## Installation
@@ -126,10 +138,10 @@ cargo install cc-downloader
 ➜ cc-downloader -h
 A polite and user-friendly downloader for Common Crawl data.
 
-Usage: cc-downloader [COMMAND]
+Usage: cc-downloader <COMMAND>
 
 Commands:
-  download-paths  Download paths for a given crawl
+  download-paths  Download paths for a given crawl and data type, or from a contributor dataset
   download        Download files from a crawl
   help            Print this message or the help of the given subcommand(s)
 
@@ -140,17 +152,48 @@ Options:
 ------
 
 ➜ cc-downloader download-paths -h
-Download paths for a given crawl
+Download paths for a given crawl and data type, or from a contributor dataset
 
-Usage: cc-downloader download-paths <CRAWL> <SUBSET> <DESTINATION>
+Usage: cc-downloader download-paths <COMMAND>
+
+Commands:
+  crawl    Download paths for a standard crawl snapshot
+  contrib  Download paths from a contributor dataset
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+------
+
+➜ cc-downloader download-paths crawl -h
+Download paths for a standard crawl snapshot
+
+Usage: cc-downloader download-paths crawl [OPTIONS] <CRAWL> <DATA_TYPE> <DESTINATION>
 
 Arguments:
   <CRAWL>        Crawl reference, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
-  <SUBSET>       Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
+  <DATA_TYPE>    Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
+  <DESTINATION>  Destination folder
+
+Options:
+      --subset <SUBSETS>...  Subsets to download (only valid for cc-index-table). Defaults to all three if omitted: crawldiagnostics, robotstxt, warc [possible values: crawldiagnostics, robotstxt, warc]
+  -h, --help                 Print help
+
+------
+
+➜ cc-downloader download-paths contrib -h
+Download paths from a contributor dataset
+
+Usage: cc-downloader download-paths contrib <URL> <DESTINATION>
+
+Arguments:
+  <URL>          URL of the contributor paths file. Must start with https://data.commoncrawl.org/contrib/
   <DESTINATION>  Destination folder
 
 Options:
   -h, --help  Print help
+
 ------
 
 ➜ cc-downloader download -h
