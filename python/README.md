@@ -146,7 +146,7 @@ cc_downloader.download(
 
 ## Politeness and retries
 
-Every HTTP request uses an exponential-backoff retry policy (bounds: 1 s – 1 h, bounded jitter, base 2). The default of 1 000 retries is intentionally high: Common Crawl is a shared public resource and transient failures are common under load. This tool is intended for use **outside of AWS**. You can monitor Common Crawl infrastructure traffic on the [Infrastructure Status Webpage](https://commoncrawl.org/status).
+Every HTTP request uses an exponential-backoff retry policy (bounds: 1 s – 1 h, bounded jitter, base 2). The default of 1 000 retries is intentionally high: Common Crawl is a shared public resource and transient failures are common under load. This tool is intended for use **outside of AWS**. You can monitor Common Crawl infrastructure traffic on the [Infrastructure Status Webpage](https://status.commoncrawl.org).
 
 Avoid setting `threads` much higher than the default of 10. Too many concurrent requests in a short period can trigger `403` errors, which are unrecoverable and cannot be retried.
 

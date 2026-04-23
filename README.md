@@ -11,7 +11,7 @@ Key features:
 - **Folder structure preservation** -- maintains the internal tree structure of Common Crawl data by default
 - **Cross-platform** -- pre-compiled binaries for Linux, macOS, and Windows
 
-This tool is intended for use outside of AWS. You can monitor Common Crawl infrastructure traffic on the [Infrastructure Status Webpage](https://commoncrawl.org/status).
+This tool is intended for use outside of AWS. You can monitor Common Crawl infrastructure traffic on the [Infrastructure Status Webpage](https://status.commoncrawl.org).
 
 ## Quick Start
 
