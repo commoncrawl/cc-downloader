@@ -1,0 +1,20 @@
+[build-system]
+    requires = ["maturin>=1.6,<2.0"]
+    build-backend = "maturin"
+
+[project]
+    name = "cc-downloader"
+    requires-python = ">=3.12"
+    description = "Python bindings for the Common Crawl downloader"
+    readme = "README.md"
+    license = { text = "MIT OR Apache-2.0" }
+    dynamic = ["version"]                                           # pulls version from Cargo.toml automaticall
+    dependencies = []
+
+[tool.maturin]
+    manifest-path = "Cargo.toml"
+    python-source = "."
+    features = ["pyo3/extension-module"]
+
+[dependency-groups]
+    dev = ["maturin>=1.6,<2.0"]
