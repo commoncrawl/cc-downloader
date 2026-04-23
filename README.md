@@ -1,4 +1,4 @@
-# CC-Downloader
+# cc-downloader
 
 A polite and user-friendly command-line tool for downloading [Common Crawl](https://commoncrawl.org) data, written in Rust.
 
@@ -218,12 +218,82 @@ Options:
 
 The number of threads can be set using the `-t` flag. The default value is 10. It is advised to use the default value to avoid being blocked by the server. If you make too many requests in a short period of time, you will start receiving `403` errors which are unrecoverable and cannot be retried by the downloader.
 
+## As a Rust library
+
+`cc-downloader` is also available as a library crate on [crates.io](https://crates.io/crates/cc-downloader). Add it to your project:
+
+```toml
+[dependencies]
+cc-downloader = "0.6"
+tokio = { version = "1", features = ["full"] }
+```
+
+The workflow mirrors the CLI: fetch a paths index first, then download the listed files.
+
+```rust
+use cc_downloader::download::{DownloadOptions, download_paths, download};
+
+#[tokio::main]
+async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
+    // Step 1: fetch the paths index for WET files.
+    let paths_options = DownloadOptions {
+        snapshot: "CC-MAIN-2024-46".to_string(),
+        data_type: "wet",
+        dst: std::path::Path::new("./output"),
+        ..Default::default()
+    };
+    download_paths(paths_options).await?;
+
+    // Step 2: download every file listed in the index.
+    let download_options = DownloadOptions {
+        paths: std::path::Path::new("./output/wet.paths.gz"),
+        dst: std::path::Path::new("./output"),
+        threads: 10,
+        progress: true,
+        ..Default::default()
+    };
+    download(download_options).await?;
+
+    Ok(())
+}
+```
+
+For `cc-index-table`, filter to specific subsets via `cc_index_table_subsets`:
+
+```rust
+let options = DownloadOptions {
+    snapshot: "CC-MAIN-2024-46".to_string(),
+    data_type: "cc-index-table",
+    dst: std::path::Path::new("./output"),
+    cc_index_table_subsets: vec!["warc".to_string(), "robotstxt".to_string()],
+    ..Default::default()
+};
+download_paths(options).await?;
+```
+
+For contributor datasets, use `download_contrib_paths` instead:
+
+```rust
+use cc_downloader::download::download_contrib_paths;
+
+download_contrib_paths(
+    "https://data.commoncrawl.org/contrib/my-dataset/paths.gz",
+    std::path::Path::new("./output"),
+    1000, // max retries
+).await?;
+```
+
+Full API documentation is available on [docs.rs](https://docs.rs/cc-downloader).
+
+## Python bindings
+
+Python bindings are available as [`cc-downloader`](https://pypi.org/project/cc-downloader/) on PyPI. See the [Python README](python/README.md) for installation and usage instructions.
+
 ## Contributing
 
 Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get involved.
 
 ## Todo
 
-- [ ] Add Python bindings
 - [ ] Add more tests
 - [ ] Handle unrecoverable errors

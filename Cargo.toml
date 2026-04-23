@@ -1,3 +1,7 @@
+[workspace]
+    members = [".", "python"]
+    resolver = "2"
+
 [package]
     name = "cc-downloader"
     version = "0.6.1"
