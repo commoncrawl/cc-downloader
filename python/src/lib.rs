@@ -30,7 +30,7 @@ fn download_paths(
     subsets: Option<Vec<String>>,
     max_retries: usize,
 ) -> PyResult<()> {
-    py.allow_threads(|| {
+    py.detach(|| {
         let rt = Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async {
             let options = DownloadOptions {
@@ -65,7 +65,7 @@ fn download_contrib_paths(
     dst: String,
     max_retries: usize,
 ) -> PyResult<()> {
-    py.allow_threads(|| {
+    py.detach(|| {
         let rt = Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(cc_download_contrib_paths(
             &url,
@@ -113,7 +113,7 @@ fn download(
             "numbered and files_only are mutually exclusive",
         ));
     }
-    py.allow_threads(|| {
+    py.detach(|| {
         let rt = Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async {
             let options = DownloadOptions {
