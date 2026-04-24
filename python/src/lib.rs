@@ -1,6 +1,6 @@
 use ::cc_downloader::download::{
-    download as cc_download, download_contrib_paths as cc_download_contrib_paths,
-    download_paths as cc_download_paths, DownloadOptions,
+    DownloadOptions, download as cc_download, download_contrib_paths as cc_download_contrib_paths,
+    download_paths as cc_download_paths,
 };
 use pyo3::prelude::*;
 use tokio::runtime::Runtime;
@@ -79,9 +79,9 @@ fn download_contrib_paths(
 
 /// Downloads every file listed in a previously obtained paths index.
 ///
-/// The GIL is released for the duration of the download, so other Python
-/// threads remain unblocked. Internally, up to `threads` files are
-/// downloaded concurrently with exponential-backoff retries.
+/// Internally, up to `threads` files are downloaded concurrently with
+/// exponential-backoff retries. The call responds to Ctrl+C: pressing it
+/// raises ``KeyboardInterrupt`` and stops the download.
 ///
 /// :param paths: Path to a ``.paths.gz`` index file.
 /// :param dst: Destination directory where downloaded files will be written.
