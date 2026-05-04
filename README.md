@@ -15,7 +15,7 @@ This tool is intended for use outside of AWS. You can monitor Common Crawl infra
 
 ## Quick Start
 
-Install via cargo:
+Install via cargo. Please make sure you have Rust installed and updated (see the [Installation section](#installation) below):
 
 ```bash
 cargo install cc-downloader
@@ -126,11 +126,37 @@ When compiling from source, please make sure you have the latest version of `rus
 rustup update
 ```
 
-Now you can install the `cc-downloader` tool by running the following command:
+Now clone the repository:
+
+```bash
+git clone git@github.com:commoncrawl/cc-downloader.git
+```
+
+Then navigate to the project folder:
+
+```bash
+cd cc-downloader
+```
+
+Use `cargo` to build the project:
+
+```bash
+cargo build --release
+```
+
+You can find the compiled binary in the `target/release` folder. You can run it by executing the following command:
+
+```bash
+./target/release/cc-downloader
+```
+
+You can also install the `cc-downloader` by running the following command:
 
 ```bash
 cargo install cc-downloader
 ```
+
+If you use `cargo install`, there is no need to clone the repository or build the project manually. `cargo install` will automatically download the source code, compile it and install the binary in a folder that is in your `PATH`. After running this command, you can run `cc-downloader` from anywhere.
 
 ## Usage
 
