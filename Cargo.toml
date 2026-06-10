@@ -1,3 +1,7 @@
+[workspace]
+    members = [".", "python"]
+    resolver = "2"
+
 [package]
     name = "cc-downloader"
     version = "0.6.1"
@@ -12,7 +16,7 @@
     documentation = "https://docs.rs/cc-downloader"
 
 [dependencies]
-    clap = { version = "4.5.60", features = ["derive"] }
+    clap = { version = "4.6.1", features = ["derive"] }
     flate2 = "1.1.9"
     futures = "0.3.32"
     indicatif = "0.18.4"
@@ -20,7 +24,7 @@
     reqwest = { version = "0.13.2" }
     reqwest-middleware = "0.5.1"
     reqwest-retry = "0.9.1"
-    tokio = { version = "1.49.0", features = ["full"] }
+    tokio = { version = "1.52.1", features = ["full"] }
     tokio-util = { version = "0.7.18", features = ["compat"] }
     url = "2.5.8"
 

@@ -12,22 +12,14 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Download paths for a given crawl
+    /// Download paths for a given crawl and data type, or from a contributor dataset
     DownloadPaths {
-        /// Crawl reference, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
-        #[arg(value_name = "CRAWL", value_parser = crawl_name_format)]
-        snapshot: String,
-
-        /// Data type
-        #[arg(value_name = "SUBSET")]
-        data_type: DataType,
-
-        /// Destination folder
-        #[arg(value_name = "DESTINATION")]
-        dst: PathBuf,
+        #[command(subcommand)]
+        source: DownloadPathsSource,
     },
 
     /// Download files from a crawl
+    #[command(arg_required_else_help = true)]
     Download {
         /// Path file
         #[arg(value_name = "PATHS")]
@@ -64,6 +56,41 @@ pub enum Commands {
     },
 }
 
+#[derive(Subcommand)]
+pub enum DownloadPathsSource {
+    /// Download paths for a standard crawl snapshot
+    Crawl {
+        /// Crawl reference, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
+        #[arg(value_name = "CRAWL", value_parser = crawl_name_format)]
+        snapshot: String,
+
+        /// Data type
+        #[arg(value_name = "DATA_TYPE")]
+        data_type: DataType,
+
+        /// Destination folder
+        #[arg(value_name = "DESTINATION")]
+        dst: PathBuf,
+
+        /// Subsets to download (only valid for cc-index-table).
+        /// Defaults to all three if omitted: crawldiagnostics, robotstxt, warc.
+        #[arg(long = "subset", value_enum, num_args = 1..)]
+        subsets: Vec<CcIndexTableSubset>,
+    },
+
+    /// Download paths from a contributor dataset
+    Contrib {
+        /// URL of the contributor paths file.
+        /// Must start with https://data.commoncrawl.org/contrib/
+        #[arg(value_name = "URL", value_parser = contrib_url_validator)]
+        url: String,
+
+        /// Destination folder
+        #[arg(value_name = "DESTINATION")]
+        dst: PathBuf,
+    },
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum DataType {
     Segment,
@@ -88,6 +115,31 @@ impl DataType {
             DataType::CcIndex => "cc-index",
             DataType::CcIndexTable => "cc-index-table",
         }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum CcIndexTableSubset {
+    Crawldiagnostics,
+    Robotstxt,
+    Warc,
+}
+
+impl CcIndexTableSubset {
+    pub fn as_str(&self) -> &str {
+        match self {
+            CcIndexTableSubset::Crawldiagnostics => "crawldiagnostics",
+            CcIndexTableSubset::Robotstxt => "robotstxt",
+            CcIndexTableSubset::Warc => "warc",
+        }
+    }
+}
+
+fn contrib_url_validator(url: &str) -> Result<String, String> {
+    if url.starts_with("https://data.commoncrawl.org/contrib/") {
+        Ok(url.to_string())
+    } else {
+        Err("URL must start with https://data.commoncrawl.org/contrib/".to_string())
     }
 }
 

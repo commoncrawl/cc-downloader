@@ -1,14 +1,49 @@
 use std::fmt;
 
+/// Error type returned by all fallible operations in this library.
+///
+/// Each variant wraps the underlying error from the relevant subsystem, so
+/// callers can pattern-match on specific failure modes or rely on the
+/// [`Display`](std::fmt::Display) impl for a human-readable message.
+///
+/// # Examples
+///
+/// ```no_run
+/// use cc_downloader::download::{DownloadOptions, download_paths};
+/// use cc_downloader::errors::DownloadError;
+///
+/// # #[tokio::main]
+/// # async fn main() {
+/// let options = DownloadOptions {
+///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     data_type: "wet",
+///     dst: std::path::Path::new("./output"),
+///     ..Default::default()
+/// };
+/// match download_paths(options).await {
+///     Ok(_) => println!("Done"),
+///     Err(DownloadError::Custom(msg)) => eprintln!("Resource not found: {msg}"),
+///     Err(e) => eprintln!("Download failed: {e}"),
+/// }
+/// # }
+/// ```
 #[derive(Debug)]
-/// An error type for the download process, encapsulating various error sources.
 pub enum DownloadError {
+    /// An error from the underlying HTTP client ([`reqwest`]).
     Reqwest(reqwest::Error),
+    /// An error from the retry middleware ([`reqwest_middleware`]).
     ReqwestMiddleware(reqwest_middleware::Error),
+    /// An I/O error, either from [`tokio::io`] or the standard library.
     Tokio(tokio::io::Error),
+    /// A URL parsing error.
     Url(url::ParseError),
+    /// An error constructing a progress bar template ([`indicatif`]).
     Indicatif(indicatif::style::TemplateError),
+    /// A task join error from the async runtime.
     Join(tokio::task::JoinError),
+    /// A domain-level error, e.g. an unrecognised snapshot reference or an
+    /// inaccessible paths URL. The inner `String` contains the full message
+    /// printed to the user.
     Custom(String),
 }
 

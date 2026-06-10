@@ -1,4 +1,4 @@
-# CC-Downloader
+# cc-downloader
 
 A polite and user-friendly command-line tool for downloading [Common Crawl](https://commoncrawl.org) data, written in Rust.
 
@@ -11,11 +11,11 @@ Key features:
 - **Folder structure preservation** -- maintains the internal tree structure of Common Crawl data by default
 - **Cross-platform** -- pre-compiled binaries for Linux, macOS, and Windows
 
-This tool is intended for use outside of AWS. You can monitor Common Crawl infrastructure traffic on the [Infrastructure Status Webpage](https://commoncrawl.org/status).
+This tool is intended for use outside of AWS. You can monitor Common Crawl infrastructure traffic on the [Infrastructure Status Webpage](https://status.commoncrawl.org).
 
 ## Quick Start
 
-Install via cargo:
+Install via cargo. Please make sure you have Rust installed and updated (see the [Installation section](#installation) below):
 
 ```bash
 cargo install cc-downloader
@@ -24,13 +24,25 @@ cargo install cc-downloader
 The workflow has two steps. First, download the file paths for a given crawl and data type:
 
 ```bash
-cc-downloader download-paths CC-MAIN-2024-46 wet path/to/folder
+cc-downloader download-paths crawl CC-MAIN-2024-46 wet path/to/folder
 ```
 
 This produces a `wet.paths.gz` file. Then, download the actual data:
 
 ```bash
 cc-downloader download path/to/folder/wet.paths.gz path/to/folder
+```
+
+For `cc-index-table` data you can optionally filter to one or more subsets (`crawldiagnostics`, `robotstxt`, `warc`). Without `--subset` all three are downloaded:
+
+```bash
+cc-downloader download-paths crawl CC-MAIN-2024-46 cc-index-table path/to/folder --subset warc robotstxt
+```
+
+To download paths from a [contributor dataset](https://data.commoncrawl.org/contrib/index.html), use the `contrib` subcommand with the direct URL to the paths file:
+
+```bash
+cc-downloader download-paths contrib https://data.commoncrawl.org/contrib/<dataset>/paths.gz path/to/folder
 ```
 
 ## Installation
@@ -114,11 +126,37 @@ When compiling from source, please make sure you have the latest version of `rus
 rustup update
 ```
 
-Now you can install the `cc-downloader` tool by running the following command:
+Now clone the repository:
+
+```bash
+git clone git@github.com:commoncrawl/cc-downloader.git
+```
+
+Then navigate to the project folder:
+
+```bash
+cd cc-downloader
+```
+
+Use `cargo` to build the project:
+
+```bash
+cargo build --release
+```
+
+You can find the compiled binary in the `target/release` folder. You can run it by executing the following command:
+
+```bash
+./target/release/cc-downloader
+```
+
+You can also install the `cc-downloader` by running the following command:
 
 ```bash
 cargo install cc-downloader
 ```
+
+If you use `cargo install`, there is no need to clone the repository or build the project manually. `cargo install` will automatically download the source code, compile it and install the binary in a folder that is in your `PATH`. After running this command, you can run `cc-downloader` from anywhere.
 
 ## Usage
 
@@ -126,10 +164,10 @@ cargo install cc-downloader
 ➜ cc-downloader -h
 A polite and user-friendly downloader for Common Crawl data.
 
-Usage: cc-downloader [COMMAND]
+Usage: cc-downloader <COMMAND>
 
 Commands:
-  download-paths  Download paths for a given crawl
+  download-paths  Download paths for a given crawl and data type, or from a contributor dataset
   download        Download files from a crawl
   help            Print this message or the help of the given subcommand(s)
 
@@ -140,17 +178,48 @@ Options:
 ------
 
 ➜ cc-downloader download-paths -h
-Download paths for a given crawl
+Download paths for a given crawl and data type, or from a contributor dataset
 
-Usage: cc-downloader download-paths <CRAWL> <SUBSET> <DESTINATION>
+Usage: cc-downloader download-paths <COMMAND>
+
+Commands:
+  crawl    Download paths for a standard crawl snapshot
+  contrib  Download paths from a contributor dataset
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+------
+
+➜ cc-downloader download-paths crawl -h
+Download paths for a standard crawl snapshot
+
+Usage: cc-downloader download-paths crawl [OPTIONS] <CRAWL> <DATA_TYPE> <DESTINATION>
 
 Arguments:
   <CRAWL>        Crawl reference, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
-  <SUBSET>       Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
+  <DATA_TYPE>    Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
+  <DESTINATION>  Destination folder
+
+Options:
+      --subset <SUBSETS>...  Subsets to download (only valid for cc-index-table). Defaults to all three if omitted: crawldiagnostics, robotstxt, warc [possible values: crawldiagnostics, robotstxt, warc]
+  -h, --help                 Print help
+
+------
+
+➜ cc-downloader download-paths contrib -h
+Download paths from a contributor dataset
+
+Usage: cc-downloader download-paths contrib <URL> <DESTINATION>
+
+Arguments:
+  <URL>          URL of the contributor paths file. Must start with https://data.commoncrawl.org/contrib/
   <DESTINATION>  Destination folder
 
 Options:
   -h, --help  Print help
+
 ------
 
 ➜ cc-downloader download -h
@@ -175,12 +244,82 @@ Options:
 
 The number of threads can be set using the `-t` flag. The default value is 10. It is advised to use the default value to avoid being blocked by the server. If you make too many requests in a short period of time, you will start receiving `403` errors which are unrecoverable and cannot be retried by the downloader.
 
+## As a Rust library
+
+`cc-downloader` is also available as a library crate on [crates.io](https://crates.io/crates/cc-downloader). Add it to your project:
+
+```toml
+[dependencies]
+cc-downloader = "0.6"
+tokio = { version = "1", features = ["full"] }
+```
+
+The workflow mirrors the CLI: fetch a paths index first, then download the listed files.
+
+```rust
+use cc_downloader::download::{DownloadOptions, download_paths, download};
+
+#[tokio::main]
+async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
+    // Step 1: fetch the paths index for WET files.
+    let paths_options = DownloadOptions {
+        snapshot: "CC-MAIN-2024-46".to_string(),
+        data_type: "wet",
+        dst: std::path::Path::new("./output"),
+        ..Default::default()
+    };
+    download_paths(paths_options).await?;
+
+    // Step 2: download every file listed in the index.
+    let download_options = DownloadOptions {
+        paths: std::path::Path::new("./output/wet.paths.gz"),
+        dst: std::path::Path::new("./output"),
+        threads: 10,
+        progress: true,
+        ..Default::default()
+    };
+    download(download_options).await?;
+
+    Ok(())
+}
+```
+
+For `cc-index-table`, filter to specific subsets via `cc_index_table_subsets`:
+
+```rust
+let options = DownloadOptions {
+    snapshot: "CC-MAIN-2024-46".to_string(),
+    data_type: "cc-index-table",
+    dst: std::path::Path::new("./output"),
+    cc_index_table_subsets: vec!["warc".to_string(), "robotstxt".to_string()],
+    ..Default::default()
+};
+download_paths(options).await?;
+```
+
+For contributor datasets, use `download_contrib_paths` instead:
+
+```rust
+use cc_downloader::download::download_contrib_paths;
+
+download_contrib_paths(
+    "https://data.commoncrawl.org/contrib/my-dataset/paths.gz",
+    std::path::Path::new("./output"),
+    1000, // max retries
+).await?;
+```
+
+Full API documentation is available on [docs.rs](https://docs.rs/cc-downloader).
+
+## Python bindings
+
+Python bindings are available as [`cc-downloader`](https://pypi.org/project/cc-downloader/) on PyPI. See the [Python README](python/README.md) for installation and usage instructions.
+
 ## Contributing
 
 Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get involved.
 
 ## Todo
 
-- [ ] Add Python bindings
 - [ ] Add more tests
 - [ ] Handle unrecoverable errors

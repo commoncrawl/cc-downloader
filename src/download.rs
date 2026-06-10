@@ -1,12 +1,12 @@
-use flate2::read::GzDecoder;
+use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
-use reqwest::{header, Client, Url};
+use reqwest::{Client, Url, header};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_retry::{policies::ExponentialBackoff, Jitter, RetryTransientMiddleware};
+use reqwest_retry::{Jitter, RetryTransientMiddleware, policies::ExponentialBackoff};
 use std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process, str,
     sync::Arc,
@@ -24,18 +24,49 @@ const BASE_URL: &str = "https://data.commoncrawl.org/";
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
-/// Options for downloading paths or files from Common Crawl.
+/// Configuration for a [`download_paths`] or [`download`] call.
+///
+/// Construct with [`DownloadOptions::new`] (for the common CLI use-case) or
+/// with a struct literal and [`Default`] for the fields you don't need:
+///
+/// ```no_run
+/// use cc_downloader::download::DownloadOptions;
+///
+/// let options = DownloadOptions {
+///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     data_type: "wet",
+///     dst: std::path::Path::new("./output"),
+///     ..Default::default()
+/// };
+/// ```
 #[derive(Clone, Debug)]
 pub struct DownloadOptions<'a> {
+    /// Crawl snapshot identifier, e.g. `"CC-MAIN-2024-46"` or `"CC-NEWS-2025-01"`.
     pub snapshot: String,
+    /// Data type to download, e.g. `"warc"`, `"wet"`, `"cc-index-table"`.
     pub data_type: &'a str,
+    /// Path to a `.paths.gz` file that lists the files to download.
+    /// Only used by [`download`]; ignored by [`download_paths`].
     pub paths: &'a Path,
+    /// Destination directory where downloaded files will be written.
     pub dst: &'a Path,
+    /// Maximum number of concurrent downloads. Defaults to `1` (via [`Default`]),
+    /// `10` via [`DownloadOptions::new`].
     pub threads: usize,
+    /// Maximum number of per-file retry attempts before giving up. Defaults to `1000`.
     pub max_retries: usize,
+    /// If `true`, output files are named sequentially (`0.txt.gz`, `1.txt.gz`, …).
+    /// Only meaningful for WET files. Mutually exclusive with [`files_only`](Self::files_only).
     pub numbered: bool,
+    /// If `true`, files are written flat into `dst` with no subdirectory structure.
+    /// Only meaningful for WARC/WET/WAT files. Mutually exclusive with [`numbered`](Self::numbered).
     pub files_only: bool,
+    /// If `true`, renders a per-file progress bar and an overall completion indicator.
     pub progress: bool,
+    /// Subset filter for `cc-index-table` downloads.
+    /// Valid values: `"crawldiagnostics"`, `"robotstxt"`, `"warc"`.
+    /// An empty `Vec` means no filtering — all subsets are retained.
+    pub cc_index_table_subsets: Vec<String>,
 }
 
 struct TaskOptions {
@@ -59,12 +90,36 @@ impl Default for DownloadOptions<'_> {
             numbered: false,
             files_only: false,
             progress: false,
+            cc_index_table_subsets: Vec::new(),
         }
     }
 }
 
 impl<'a> DownloadOptions<'a> {
-    /// Creates a new `DownloadOptions` instance with the provided parameters.
+    /// Creates a `DownloadOptions` with sensible defaults for downloading data files.
+    ///
+    /// Validates `snapshot` against the expected crawl name format
+    /// (`CC-MAIN-YYYY-WW` or `CC-NEWS-YYYY-MM`) and exits the process with an
+    /// error message if the format is invalid.
+    ///
+    /// Defaults: `threads = 10`, `max_retries = 1000`, `cc_index_table_subsets = []`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cc_downloader::download::DownloadOptions;
+    ///
+    /// let mut options = DownloadOptions::new(
+    ///     "CC-MAIN-2024-46",
+    ///     "wet",
+    ///     "./output/wet.paths.gz",
+    ///     "./output",
+    ///     false, // numbered
+    ///     false, // files_only
+    ///     true,  // progress
+    /// );
+    /// options.set_threads(5);
+    /// ```
     pub fn new(
         snapshot: &'a str,
         data_type: &'a str,
@@ -89,14 +144,56 @@ impl<'a> DownloadOptions<'a> {
             numbered,
             files_only,
             progress,
+            cc_index_table_subsets: Vec::new(),
         }
     }
+    /// Sets the number of concurrent download threads.
     pub fn set_threads(&mut self, threads: usize) {
         self.threads = threads;
     }
+    /// Sets the maximum number of per-file retry attempts.
     pub fn set_max_retries(&mut self, max_retries: usize) {
         self.max_retries = max_retries;
     }
+}
+
+fn filter_cc_index_table_paths(path: &Path, subsets: &[String]) -> Result<(), DownloadError> {
+    // Read and decompress the downloaded paths file
+    let file = File::open(path)?;
+    let decoder = GzDecoder::new(file);
+    let reader = BufReader::new(decoder);
+
+    // Keep only lines that match one of the requested subsets.
+    // Each line looks like:
+    //   cc-index/table/cc-main/warc/crawl=CC-MAIN-2026-08/subset=crawldiagnostics/part-...
+    // so a simple `contains("subset=<name>")` is sufficient.
+    let filtered: Vec<String> = reader
+        .lines()
+        .filter_map(|line| {
+            let line = line.ok()?;
+            let keep = subsets
+                .iter()
+                .any(|s| line.contains(&format!("subset={s}")));
+            if keep { Some(line) } else { None }
+        })
+        .collect();
+
+    println!(
+        "Filtered to {} paths ({} subsets requested)",
+        filtered.len(),
+        subsets.len()
+    );
+
+    // Overwrite the same file with the filtered + re-compressed content
+    let out = File::create(path)?;
+    let mut encoder = GzEncoder::new(out, Compression::default());
+    for line in &filtered {
+        encoder.write_all(line.as_bytes())?;
+        encoder.write_all(b"\n")?;
+    }
+    encoder.finish()?;
+
+    Ok(())
 }
 
 fn crawl_name_format(crawl: &str) -> Result<String, String> {
@@ -126,7 +223,143 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
         .build())
 }
 
-/// Downloads the paths file for a specific Common Crawl snapshot and data type.
+/// Downloads a paths file directly from a contributor dataset URL.
+///
+/// Unlike [`download_paths`], this function accepts an arbitrary URL rather
+/// than constructing one from a snapshot and data type. The URL should point
+/// to a gzip-compressed paths file hosted under
+/// `https://data.commoncrawl.org/contrib/`.
+///
+/// # Errors
+///
+/// Returns [`DownloadError`] if:
+/// - The URL cannot be parsed
+/// - The server returns a non-success HTTP status
+/// - Writing the destination file fails
+///
+/// # Examples
+///
+/// ```no_run
+/// use cc_downloader::download::download_contrib_paths;
+///
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
+/// download_contrib_paths(
+///     "https://data.commoncrawl.org/contrib/my-dataset/paths.gz",
+///     std::path::Path::new("./output"),
+///     1000,
+/// ).await?;
+/// # Ok(())
+/// # }
+/// ```
+pub async fn download_contrib_paths(
+    url: &str,
+    dst: &Path,
+    max_retries: usize,
+) -> Result<(), DownloadError> {
+    let url = Url::parse(url)?;
+    let client = new_client(max_retries)?;
+
+    let filename = url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .unwrap_or("file.download");
+
+    println!("Downloading contrib paths from: {url}");
+
+    let resp = client.head(url.as_str()).send().await?;
+    match resp.status() {
+        status if status.is_success() => (),
+        status => {
+            return Err(format!(
+                "Couldn't download URL: {}. Error code: {} {}",
+                url,
+                status.as_str(),
+                status.canonical_reason().unwrap_or("")
+            )
+            .into());
+        }
+    }
+
+    let mut dst = dst.to_path_buf();
+    dst.push(filename);
+
+    if let Some(parent) = dst.parent()
+        && !parent.exists()
+    {
+        println!("Creating directory: {}", parent.to_str().unwrap());
+        tokio::fs::create_dir_all(parent).await?;
+    }
+
+    let outfile = tokio::fs::File::create(dst.clone()).await?;
+    let mut outfile = BufWriter::new(outfile);
+
+    let mut download = client.get(url.as_str()).send().await?;
+    while let Some(chunk) = download.chunk().await? {
+        outfile.write_all(&chunk).await?;
+    }
+    outfile.flush().await?;
+
+    println!("Downloaded contrib paths to: {}", dst.to_str().unwrap());
+    Ok(())
+}
+
+/// Downloads the paths index file for a Common Crawl snapshot and data type.
+///
+/// Constructs the URL from `options.snapshot` and `options.data_type`, performs
+/// a HEAD request to verify the resource exists (returning a descriptive error
+/// for 404s), then streams the gzip-compressed file to `options.dst`.
+///
+/// For `cc-index-table` downloads, if `options.cc_index_table_subsets` is
+/// non-empty the saved file is filtered in place so it only contains paths
+/// for the requested subsets (`"crawldiagnostics"`, `"robotstxt"`, `"warc"`).
+///
+/// # Errors
+///
+/// Returns [`DownloadError`] if:
+/// - The constructed URL cannot be parsed
+/// - The server returns a non-success HTTP status (404 produces a descriptive message)
+/// - Writing the destination file fails
+/// - Subset filtering fails (I/O error re-compressing the file)
+///
+/// # Examples
+///
+/// Download all paths for a WET crawl:
+///
+/// ```no_run
+/// use cc_downloader::download::{DownloadOptions, download_paths};
+///
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
+/// let options = DownloadOptions {
+///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     data_type: "wet",
+///     dst: std::path::Path::new("./output"),
+///     ..Default::default()
+/// };
+/// download_paths(options).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Download only the `warc` and `robotstxt` subsets of a `cc-index-table` crawl:
+///
+/// ```no_run
+/// use cc_downloader::download::{DownloadOptions, download_paths};
+///
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
+/// let options = DownloadOptions {
+///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     data_type: "cc-index-table",
+///     dst: std::path::Path::new("./output"),
+///     cc_index_table_subsets: vec!["warc".to_string(), "robotstxt".to_string()],
+///     ..Default::default()
+/// };
+/// download_paths(options).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
 
@@ -180,6 +413,13 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
 
     dst.push(filename);
 
+    if let Some(parent) = dst.parent()
+        && !parent.exists()
+    {
+        println!("Creating directory: {}", parent.to_str().unwrap());
+        tokio::fs::create_dir_all(parent).await?;
+    }
+
     let outfile = tokio::fs::File::create(dst.clone()).await?;
     let mut outfile = BufWriter::new(outfile);
 
@@ -191,13 +431,17 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
 
     outfile.flush().await?;
 
+    // Filter the downloaded paths file if subset filtering was requested
+    if options.data_type == "cc-index-table" && !options.cc_index_table_subsets.is_empty() {
+        filter_cc_index_table_paths(&dst, &options.cc_index_table_subsets)?;
+    }
+
     println!("Downloaded paths to: {}", dst.to_str().unwrap());
 
     Ok(())
 }
 
 // Based on: https://github.com/benkay86/async-applied/blob/master/indicatif-reqwest-tokio/src/bin/indicatif-reqwest-tokio-multi.rs
-
 async fn download_task(
     client: ClientWithMiddleware,
     multibar: Arc<MultiProgress>,
@@ -261,10 +505,10 @@ async fn download_task(
     }
 
     // Create the directory if it doesn't exist
-    if !task_options.numbered {
-        if let Some(parent) = dst.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
+    if !task_options.numbered
+        && let Some(parent) = dst.parent()
+    {
+        tokio::fs::create_dir_all(parent).await?;
     }
 
     // Create the output file with tokio's async fs lib
@@ -303,7 +547,37 @@ async fn download_task(
     Ok(())
 }
 
-/// Downloads files from Common Crawl based on the provided options (including the paths file).
+/// Downloads every file listed in a previously obtained `.paths.gz` index.
+///
+/// Reads the gzip-compressed paths file at `options.paths`, prepends the
+/// Common Crawl base URL to each entry, then downloads all files concurrently
+/// up to `options.threads` at a time. Each file is retried up to
+/// `options.max_retries` times with exponential backoff and jitter.
+///
+/// # Errors
+///
+/// Returns [`DownloadError`] if the paths file
+/// cannot be opened, or if the progress bar template is invalid. Individual
+/// file errors are printed to stderr but do not abort the remaining downloads.
+///
+/// # Examples
+///
+/// ```no_run
+/// use cc_downloader::download::{DownloadOptions, download};
+///
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
+/// let options = DownloadOptions {
+///     paths: std::path::Path::new("./output/wet.paths.gz"),
+///     dst: std::path::Path::new("./output"),
+///     threads: 10,
+///     progress: true,
+///     ..Default::default()
+/// };
+/// download(options).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     // A vector containing all the URLs to download
 
