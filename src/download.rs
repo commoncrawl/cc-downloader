@@ -1,5 +1,6 @@
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use ratelimit::{Ratelimiter, TryWaitError};
 use regex::Regex;
 use reqwest::{Client, Url, header};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
@@ -23,6 +24,17 @@ use crate::errors::DownloadError;
 const BASE_URL: &str = "https://data.commoncrawl.org/";
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
+async fn rate_limit_acquire(limiter: &Ratelimiter) {
+    loop {
+        match limiter.try_wait() {
+            Ok(()) => return,
+            Err(TryWaitError::Insufficient(wait)) => tokio::time::sleep(wait).await,
+            Err(TryWaitError::ExceedsCapacity) => unreachable!("max_tokens > 0"),
+            Err(_) => unreachable!(),
+        }
+    }
+}
 
 /// Configuration for a [`download_paths`] or [`download`] call.
 ///
@@ -76,6 +88,7 @@ struct TaskOptions {
     pub numbered: bool,
     pub files_only: bool,
     pub progress: bool,
+    pub rate_limiter: Arc<Ratelimiter>,
 }
 
 impl Default for DownloadOptions<'_> {
@@ -450,6 +463,8 @@ async fn download_task(
     // Parse URL into Url type
     let url = Url::parse(&task_options.path)?;
 
+    // Acquire a permit from the rate limiter before making the request.
+    rate_limit_acquire(&task_options.rate_limiter).await;
     // We need to determine the file size before we download, so we can create a ProgressBar
     // A Header request for the CONTENT_LENGTH header gets us the file size
     let download_size = {
@@ -515,6 +530,8 @@ async fn download_task(
     let outfile = tokio::fs::File::create(dst.clone()).await?;
     let mut outfile = BufWriter::new(outfile);
 
+    // Acquire a permit from the rate limiter before making the request.
+    rate_limit_acquire(&task_options.rate_limiter).await;
     // Do the actual request to download the file
     let mut download = request.send().await?;
 
@@ -632,6 +649,13 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
 
     let client = new_client(options.max_retries)?;
 
+    let rate_limiter = Arc::new(
+        Ratelimiter::builder(5)
+            .max_tokens(1499)
+            .build()
+            .expect("invalid rate limit config"),
+    );
+
     let semaphore = Arc::new(Semaphore::new(options.threads));
     let mut set = JoinSet::new();
 
@@ -642,6 +666,7 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
         let client = client.clone();
         let dst = options.dst.to_path_buf();
         let semaphore = semaphore.clone();
+        let rate_limiter = rate_limiter.clone();
         set.spawn(async move {
             let _permit = semaphore.acquire().await;
             let task_options = TaskOptions {
@@ -651,6 +676,7 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
                 numbered: options.numbered,
                 files_only: options.files_only,
                 progress: options.progress,
+                rate_limiter,
             };
             let res = download_task(client, multibar, task_options).await;
             if options.progress {
