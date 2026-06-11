@@ -650,8 +650,8 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
     let client = new_client(options.max_retries)?;
 
     let rate_limiter = Arc::new(
-        Ratelimiter::builder(5)
-            .max_tokens(1499)
+        Ratelimiter::builder(1499)
+            .period(Duration::from_secs(300))
             .build()
             .expect("invalid rate limit config"),
     );
