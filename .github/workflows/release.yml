@@ -77,32 +77,23 @@ jobs:
   # platform covers all Python >= 3.12. This mirrors the Rust binary targets above.
   build-wheels:
     needs: create-release
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-latest
-            target: x86_64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
             manylinux: auto
-            artifact: linux-x86_64
-          - runner: ubuntu-latest
-            target: aarch64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
             manylinux: auto
-            artifact: linux-aarch64
-          - runner: ubuntu-latest
-            target: x86_64
-            manylinux: musllinux_1_2
-            artifact: musllinux-x86_64
-          - runner: windows-latest
-            target: x64
-            artifact: windows-x64
-          - runner: macos-13
-            target: x86_64
-            artifact: macos-x86_64
-          - runner: macos-14
-            target: aarch64
-            artifact: macos-aarch64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -130,7 +121,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.artifact }}
+          name: wheels-${{ matrix.target }}
           path: python/dist
 
   build-sdist:
