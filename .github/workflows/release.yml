@@ -168,8 +168,7 @@ jobs:
     needs: [ build-wheels, build-sdist ]
     runs-on: ubuntu-latest
     # Trusted Publishing (OIDC) — no API token. Requires a one-time "trusted
-    # publisher" entry on PyPI for this repo + workflow (+ environment if set).
-    environment: pypi
+    # publisher" entry on PyPI for this repo + workflow.
     permissions:
       id-token: write
     steps:
