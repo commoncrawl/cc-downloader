@@ -71,3 +71,116 @@ jobs:
           checksum: sha512
           # (required) GitHub token for uploading assets to GitHub Releases.
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  # --- Python bindings: build the maturin/PyO3 wheels, then publish to PyPI ---
+  # The bindings live in python/ and use abi3-py312, so one stable-ABI wheel per
+  # platform covers all Python >= 3.12. This mirrors the Rust binary targets above.
+  build-wheels:
+    needs: create-release
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64
+            manylinux: auto
+            artifact: linux-x86_64
+          - runner: ubuntu-latest
+            target: aarch64
+            manylinux: auto
+            artifact: linux-aarch64
+          - runner: ubuntu-latest
+            target: x86_64
+            manylinux: musllinux_1_2
+            artifact: musllinux-x86_64
+          - runner: windows-latest
+            target: x64
+            artifact: windows-x64
+          - runner: macos-13
+            target: x86_64
+            artifact: macos-x86_64
+          - runner: macos-14
+            target: aarch64
+            artifact: macos-aarch64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set wheel version from tag
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*([.+-].*)?$ ]]; then
+            echo "::error::Tag '$TAG' is not a valid version"; exit 1
+          fi
+          echo "Setting cc-downloader-python version to $version"
+          python -c "import re,sys,pathlib; p=pathlib.Path('python/Cargo.toml'); t,n=re.subn(r'(?m)^(\s*version\s*=\s*)\"[^\"]*\"', r'\1\"'+sys.argv[1]+'\"', p.read_text(), count=1); assert n==1, 'version line not found'; p.write_text(t)" "$version"
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          sccache: 'true'
+          manylinux: ${{ matrix.manylinux }}
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.artifact }}
+          path: python/dist
+
+  build-sdist:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set sdist version from tag
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*([.+-].*)?$ ]]; then
+            echo "::error::Tag '$TAG' is not a valid version"; exit 1
+          fi
+          echo "Setting cc-downloader-python version to $version"
+          python -c "import re,sys,pathlib; p=pathlib.Path('python/Cargo.toml'); t,n=re.subn(r'(?m)^(\s*version\s*=\s*)\"[^\"]*\"', r'\1\"'+sys.argv[1]+'\"', p.read_text(), count=1); assert n==1, 'version line not found'; p.write_text(t)" "$version"
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          command: sdist
+          args: --out dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: python/dist
+
+  publish-pypi:
+    needs: [ build-wheels, build-sdist ]
+    runs-on: ubuntu-latest
+    # Trusted Publishing (OIDC) — no API token. Requires a one-time "trusted
+    # publisher" entry on PyPI for this repo + workflow (+ environment if set).
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download all distributions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+          packages-dir: dist
