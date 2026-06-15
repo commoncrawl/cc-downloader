@@ -40,7 +40,10 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist
           sccache: 'true'
-          manylinux: auto
+          # manylinux2014 (the `auto` default) ships a CentOS 7-era cross GCC that
+          # can't compile aws-lc-sys's ARMv8 crypto for the aarch64 wheel. 2_28
+          # (AlmaLinux 8 / GCC 12) can — at the cost of requiring glibc >= 2.28.
+          manylinux: 2_28
       - name: Smoke-test the wheel
         # Only the native (x86_64) wheel can be imported on the x86_64 runner;
         # the cross-compiled aarch64 wheel cannot run here.

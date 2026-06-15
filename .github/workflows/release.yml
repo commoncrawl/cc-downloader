@@ -82,12 +82,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # manylinux_2_28 (not the `auto`/manylinux2014 default): its GCC 12
+          # toolchain can cross-compile aws-lc-sys's ARMv8 crypto for the aarch64
+          # wheel. Trade-off: the wheels require glibc >= 2.28.
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            manylinux: auto
+            manylinux: 2_28
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            manylinux: auto
+            manylinux: 2_28
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: aarch64-apple-darwin
