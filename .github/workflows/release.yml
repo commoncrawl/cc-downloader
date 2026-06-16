@@ -6,10 +6,40 @@ permissions:
 on:
   push:
     tags:
+      # Final releases (v0.6.1) -> PyPI + GitHub Release with Rust binaries.
+      # PEP 440 pre-release / dev tags (v0.6.1.dev1, v0.6.1rc1) -> TestPyPI only,
+      # no GitHub Release and no Rust binaries. Routing is decided by `detect`.
       - v[0-9]+.*
 
 jobs:
+  # Classify the tag once so every downstream job can branch on it. A tag whose
+  # version carries a PEP 440 pre-release (aN/bN/rcN) or dev (.devN) marker is a
+  # "prerelease": it goes to TestPyPI and skips the Rust release entirely.
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.check.outputs.prerelease }}
+    steps:
+      - id: check
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*([.+-].*)?$ ]]; then
+            echo "::error::Tag '$TAG' is not a valid version"; exit 1
+          fi
+          if [[ "$version" =~ (a|b|rc)[0-9]+ || "$version" == *dev* ]]; then
+            echo "Tag '$TAG' is a pre-release -> TestPyPI, no Rust release"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag '$TAG' is a final release -> PyPI + Rust release"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
   create-release:
+    needs: detect
+    if: needs.detect.outputs.prerelease == 'false'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +49,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   upload-assets:
-    needs: create-release
+    needs: [ detect, create-release ]
+    if: needs.detect.outputs.prerelease == 'false'
     strategy:
       matrix:
         include:
@@ -76,7 +107,7 @@ jobs:
   # The bindings live in python/ and use abi3-py312, so one stable-ABI wheel per
   # platform covers all Python >= 3.12. This mirrors the Rust binary targets above.
   build-wheels:
-    needs: create-release
+    needs: detect
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -128,7 +159,7 @@ jobs:
           path: python/dist
 
   build-sdist:
-    needs: create-release
+    needs: detect
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -159,10 +190,11 @@ jobs:
           path: python/dist
 
   publish-pypi:
-    needs: [ build-wheels, build-sdist ]
+    needs: [ detect, build-wheels, build-sdist ]
     runs-on: ubuntu-latest
     # Trusted Publishing (OIDC) — no API token. Requires a one-time "trusted
-    # publisher" entry on PyPI for this repo + workflow.
+    # publisher" entry for this repo + workflow on BOTH indexes: pypi.org (final
+    # releases) and test.pypi.org (pre-release / dev tags).
     permissions:
       id-token: write
     steps:
@@ -172,8 +204,10 @@ jobs:
           pattern: wheels-*
           path: dist
           merge-multiple: true
-      - name: Publish to PyPI
+      # Pre-release / dev tags publish to TestPyPI; final releases to PyPI.
+      - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          repository-url: ${{ needs.detect.outputs.prerelease == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
           skip-existing: true
           packages-dir: dist
