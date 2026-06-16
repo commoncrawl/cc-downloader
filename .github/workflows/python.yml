@@ -49,7 +49,7 @@ jobs:
         # the cross-compiled aarch64 wheel cannot run here.
         if: matrix.target == 'x86_64'
         run: |
-          pip install --find-links "$PWD/dist" --force-reinstall cc-downloader
+          pip install --find-links "$PWD/dist" --force-reinstall cc-downloader-test
           # Import from a neutral dir: the python/ working dir contains the
           # cc_downloader source package, which would shadow the installed wheel.
           cd "$RUNNER_TEMP"
