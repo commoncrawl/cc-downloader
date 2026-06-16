@@ -3,7 +3,7 @@
     build-backend = "maturin"
 
 [project]
-    name = "cc-downloader"
+    name = "cc-downloader-test"
     requires-python = ">=3.12"
     description = "Python bindings for the Common Crawl downloader"
     readme = "README.md"
