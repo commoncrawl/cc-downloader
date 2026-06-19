@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::process;
 
 use crate::cli::{Commands, DataType, DownloadPathsSource};
 use cc_downloader::download;
@@ -32,13 +33,19 @@ async fn main() {
                 };
                 match download::download_paths(options).await {
                     Ok(_) => (),
-                    Err(e) => eprintln!("Error downloading paths: {e}"),
+                    Err(e) => {
+                        eprintln!("Error downloading paths: {e}");
+                        process::exit(1);
+                    }
                 }
             }
             DownloadPathsSource::Contrib { url, dst } => {
                 match download::download_contrib_paths(&url, &dst, 1000).await {
                     Ok(_) => (),
-                    Err(e) => eprintln!("Error downloading contrib paths: {e}"),
+                    Err(e) => {
+                        eprintln!("Error downloading contrib paths: {e}");
+                        process::exit(1);
+                    }
                 }
             }
         },
@@ -53,6 +60,7 @@ async fn main() {
         } => {
             if numbered && files_only {
                 eprintln!("Numbered and Files Only flags are incompatible");
+                process::exit(1);
             } else {
                 let options = download::DownloadOptions {
                     paths: &path_file,
@@ -68,6 +76,7 @@ async fn main() {
                     Ok(_) => (),
                     Err(e) => {
                         eprintln!("Error downloading paths: {e}");
+                        process::exit(1);
                     }
                 };
             }
