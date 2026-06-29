@@ -1,0 +1,151 @@
+name: Python bindings
+
+# Build (and smoke-test) the maturin/PyO3 wheels on every push and PR so that
+# breakage is caught long before a release tag is cut. Publishing lives in
+# release.yml; this workflow only validates that the wheels build everywhere.
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The maturin project lives in python/ (its own pyproject.toml + Cargo.toml),
+# and the abi3-py312 feature means a single stable-ABI wheel per platform covers
+# all Python >= 3.12 — so no per-Python-version matrix and no --find-interpreter.
+defaults:
+  run:
+    working-directory: python
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ x86_64, aarch64 ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          sccache: 'true'
+          # manylinux2014 (the `auto` default) ships a CentOS 7-era cross GCC that
+          # can't compile aws-lc-sys's ARMv8 crypto for the aarch64 wheel. 2_28
+          # (AlmaLinux 8 / GCC 12) can — at the cost of requiring glibc >= 2.28.
+          manylinux: 2_28
+      - name: Smoke-test the wheel
+        # Only the native (x86_64) wheel can be imported on the x86_64 runner;
+        # the cross-compiled aarch64 wheel cannot run here.
+        if: matrix.target == 'x86_64'
+        run: |
+          pip install --find-links "$PWD/dist" --force-reinstall cc-downloader
+          # Import from a neutral dir: the python/ working dir contains the
+          # cc_downloader source package, which would shadow the installed wheel.
+          cd "$RUNNER_TEMP"
+          python -c "import cc_downloader; print(cc_downloader.__all__)"
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.target }}
+          path: python/dist
+
+  musllinux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ x86_64 ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          sccache: 'true'
+          manylinux: musllinux_1_2
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-musllinux-${{ matrix.target }}
+          path: python/dist
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ x64 ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.target }}
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          sccache: 'true'
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-${{ matrix.target }}
+          path: python/dist
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ x86_64, aarch64 ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          sccache: 'true'
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-${{ matrix.target }}
+          path: python/dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          command: sdist
+          args: --out dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: python/dist

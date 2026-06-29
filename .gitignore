@@ -56,3 +56,5 @@ __pycache__/
 dist/
 .mypy_cache/
 .ruff_cache/
+
+.idea
