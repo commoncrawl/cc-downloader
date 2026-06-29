@@ -7,14 +7,17 @@ on:
   push:
     tags:
       # Final releases (v0.6.1) -> PyPI + GitHub Release with Rust binaries.
-      # PEP 440 pre-release / dev tags (v0.6.1.dev1, v0.6.1rc1) -> TestPyPI only,
-      # no GitHub Release and no Rust binaries. Routing is decided by `detect`.
+      # SemVer pre-release tags (v0.6.1-alpha.1, v0.6.1-beta.1, v0.6.1-rc.1) ->
+      # TestPyPI only, no GitHub Release and no Rust binaries. maturin converts
+      # the SemVer version to PEP 440 for the wheel (-alpha.1 -> a1, -rc.1 ->
+      # rc1). Routing is decided by `detect`.
       - v[0-9]+.*
 
 jobs:
   # Classify the tag once so every downstream job can branch on it. A tag whose
-  # version carries a PEP 440 pre-release (aN/bN/rcN) or dev (.devN) marker is a
-  # "prerelease": it goes to TestPyPI and skips the Rust release entirely.
+  # version carries a SemVer pre-release segment (anything after a `-`, e.g.
+  # -alpha.1 / -beta.1 / -rc.1) is a "prerelease": it goes to TestPyPI and skips
+  # the Rust release entirely.
   detect:
     runs-on: ubuntu-latest
     outputs:
@@ -26,10 +29,10 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
-          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*([.+-].*)?$ ]]; then
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?(\+[0-9A-Za-z.]+)?$ ]]; then
             echo "::error::Tag '$TAG' is not a valid version"; exit 1
           fi
-          if [[ "$version" =~ (a|b|rc)[0-9]+ || "$version" == *dev* ]]; then
+          if [[ "$version" == *-* ]]; then
             echo "Tag '$TAG' is a pre-release -> TestPyPI, no Rust release"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
@@ -139,7 +142,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
-          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*([.+-].*)?$ ]]; then
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?(\+[0-9A-Za-z.]+)?$ ]]; then
             echo "::error::Tag '$TAG' is not a valid version"; exit 1
           fi
           echo "Setting cc-downloader-python version to $version"
@@ -172,7 +175,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
-          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*([.+-].*)?$ ]]; then
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?(\+[0-9A-Za-z.]+)?$ ]]; then
             echo "::error::Tag '$TAG' is not a valid version"; exit 1
           fi
           echo "Setting cc-downloader-python version to $version"
