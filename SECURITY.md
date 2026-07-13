@@ -6,6 +6,7 @@ Only the latest minor version is being supported
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.x.x   | :white_check_mark: |
 | 0.6.x   | :white_check_mark: |
 | < 0.6.0 | :x:                |
 

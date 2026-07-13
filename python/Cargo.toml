@@ -1,0 +1,13 @@
+[package]
+    name = "cc-downloader-python"
+    version = "0.1.0"
+    edition = "2024"
+
+[lib]
+    name = "cc_downloader"
+    crate-type = ["cdylib"]
+
+[dependencies]
+    cc-downloader = { path = ".." }
+pyo3 = { version = "0.28", features = ["extension-module", "abi3-py312"] }
+    tokio = { version = "1", features = ["full"] }
