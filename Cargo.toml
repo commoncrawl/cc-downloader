@@ -4,7 +4,7 @@
 
 [package]
     name = "cc-downloader"
-    version = "0.6.1"
+    version = "1.0.0"
     edition = "2024"
     authors = ["Pedro Ortiz Suarez <pedro@commoncrawl.org>"]
     description = "A polite and user-friendly downloader for Common Crawl data."
@@ -20,7 +20,7 @@
     flate2 = "1.1.9"
     futures = "0.3.32"
     indicatif = "0.18.4"
-ratelimit = "2.0.0"
+    ratelimit = "2.0.0"
     regex = "1.12.3"
     reqwest = { version = "0.13.2" }
     reqwest-middleware = "0.5.1"
