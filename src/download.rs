@@ -416,7 +416,7 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
                 status.as_str(),
                 status.canonical_reason().unwrap_or("")
             )
-            .into());
+                .into());
         }
     }
 
@@ -699,11 +699,18 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
     };
 
     // Wait for the tasks to finish.
+    let mut had_error = false;
     while let Some(result) = set.join_next().await {
         match result {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("Error: {e:?}"),
-            Err(e) => eprintln!("Error: {e:?}"),
+            Ok(Err(e)) => {
+                eprintln!("Error: {e:?}");
+                had_error = true;
+            }
+            Err(e) => {
+                eprintln!("Error: {e:?}");
+                had_error = true;
+            }
         }
     }
 
@@ -718,6 +725,9 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
         multibar.await?;
     } else {
         println!("All downloads completed");
+    }
+    if had_error {
+        return Err(String::from("one or more downloads failed").into());
     }
     Ok(())
 }
