@@ -30,7 +30,7 @@ pub enum Commands {
         dst: PathBuf,
 
         /// Download files without the folder structure. This only works for WARC/WET/WAT files
-        #[arg(short, long)]
+        #[arg(short, long, conflicts_with = "numbered")]
         files_only: bool,
 
         ///Enumerate output files for compatibility with Ungoliant Pipeline. This only works for WET files
