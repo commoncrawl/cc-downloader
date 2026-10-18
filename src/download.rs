@@ -416,7 +416,7 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
                 status.as_str(),
                 status.canonical_reason().unwrap_or("")
             )
-                .into());
+            .into());
         }
     }
 
@@ -573,9 +573,11 @@ async fn download_task(
 ///
 /// # Errors
 ///
-/// Returns [`DownloadError`] if the paths file
-/// cannot be opened, or if the progress bar template is invalid. Individual
-/// file errors are printed to stderr but do not abort the remaining downloads.
+/// Returns [`DownloadError`] if the paths file cannot be opened or read, or if
+/// the progress bar template is invalid. Individual file failures do not abort
+/// the remaining downloads: each one is printed to stderr as it happens, and
+/// once every task has finished a [`DownloadError::Custom`] reporting how many
+/// downloads failed is returned.
 ///
 /// # Examples
 ///
@@ -599,29 +601,22 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
     // A vector containing all the URLs to download
 
     let file = {
-        let gzip_file = match File::open(options.paths) {
-            Ok(file) => file,
-            Err(e) => {
-                eprintln!(
-                    "Could not open file {}\nError: {}",
-                    options.paths.display(),
-                    e
-                );
-                process::exit(1)
-            }
-        };
+        let gzip_file = File::open(options.paths).map_err(|e| {
+            DownloadError::Custom(format!(
+                "Could not open file {}: {e}",
+                options.paths.display()
+            ))
+        })?;
         let file_decoded = GzDecoder::new(gzip_file);
         BufReader::new(file_decoded)
     };
 
-    let paths: Vec<(usize, String)> = file
-        .lines()
-        .map(|line| {
-            let line = line.unwrap();
-            format!("{BASE_URL}{line}")
-        })
-        .enumerate()
-        .collect();
+    // A vector containing all the URLs to download
+    let mut paths: Vec<(usize, String)> = Vec::new();
+    for (number, line) in file.lines().enumerate() {
+        paths.push((number, format!("{BASE_URL}{}", line?)));
+    }
+    let total = paths.len();
 
     // Set up a new multi-progress bar.
     // The bar is stored in an `Arc` to facilitate sharing between threads.
@@ -699,35 +694,36 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
     };
 
     // Wait for the tasks to finish.
-    let mut had_error = false;
+    // A task can fail on its own (Ok(Err)) or panic / be cancelled (Err(JoinError)).
+    let mut failed = 0usize;
     while let Some(result) = set.join_next().await {
         match result {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => {
-                eprintln!("Error: {e:?}");
-                had_error = true;
-            }
-            Err(e) => {
-                eprintln!("Error: {e:?}");
-                had_error = true;
-            }
+            Ok(Ok(())) => continue,
+            Ok(Err(e)) => eprintln!("Error: {e:?}"),
+            Err(e) => eprintln!("Error: {e:?}"),
         }
+        failed += 1;
     }
 
     if options.progress {
         // Change the message on the overall progress indicator.
-        main_pb.finish_with_message("done");
+        main_pb.finish_with_message(if failed == 0 {
+            "done"
+        } else {
+            "done with errors"
+        });
 
         // Wait for the progress bars to finish rendering.
         // The first ? unwraps the outer join() in which we are waiting for the
         // future spawned by tokio::task::spawn_blocking to finish.
         // The second ? unwraps the inner multibar.join().
         multibar.await?;
-    } else {
+    } else if failed == 0 {
         println!("All downloads completed");
     }
-    if had_error {
-        return Err(String::from("one or more downloads failed").into());
+
+    if failed > 0 {
+        return Err(format!("{failed} of {total} downloads failed").into());
     }
     Ok(())
 }
