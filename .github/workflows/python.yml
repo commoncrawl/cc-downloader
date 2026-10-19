@@ -86,17 +86,24 @@ jobs:
           path: python/dist
 
   windows:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        target: [ x64 ]
+        include:
+          - target: x64
+            runner: windows-latest
+          # Native Windows on ARM runner. setup-python names the architecture
+          # `arm64`, while maturin-action expects `aarch64`.
+          - target: aarch64
+            runner: windows-11-arm
+            python-arch: arm64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          architecture: ${{ matrix.target }}
+          architecture: ${{ matrix.python-arch || matrix.target }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -104,6 +111,16 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist
           sccache: 'true'
+      - name: Smoke-test the wheel
+        # Both Windows wheels are built natively for their runner, so both can
+        # be imported here.
+        shell: bash
+        run: |
+          pip install --find-links "$PWD/dist" --force-reinstall cc-downloader
+          # Import from a neutral dir: the python/ working dir contains the
+          # cc_downloader source package, which would shadow the installed wheel.
+          cd "$RUNNER_TEMP"
+          python -c "import cc_downloader; print(cc_downloader.__all__)"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
