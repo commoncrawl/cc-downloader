@@ -5,14 +5,14 @@ use ::cc_downloader::download::{
 use pyo3::prelude::*;
 use tokio::runtime::Runtime;
 
-/// Downloads the paths index file for a Common Crawl snapshot and data type.
+/// Downloads the paths index file for a Common Crawl crawl archive and data type.
 ///
 /// For `cc-index-table`, pass a list of subset names to `subsets` to restrict
 /// the downloaded index to only those subsets. Valid values are
 /// ``"crawldiagnostics"``, ``"robotstxt"``, and ``"warc"``. Omit `subsets`
 /// (or pass ``None``) to download all three.
 ///
-/// :param snapshot: Crawl snapshot identifier, e.g. ``"CC-MAIN-2024-46"``
+/// :param crawl: Crawl archive identifier, e.g. ``"CC-MAIN-2024-46"``
 ///     or ``"CC-NEWS-2025-01"``.
 /// :param data_type: Data type to download, e.g. ``"warc"``, ``"wet"``,
 ///     ``"cc-index-table"``.
@@ -21,10 +21,10 @@ use tokio::runtime::Runtime;
 /// :param max_retries: Maximum per-request retry attempts (default ``1000``).
 /// :raises RuntimeError: If the download fails.
 #[pyfunction]
-#[pyo3(signature = (snapshot, data_type, dst, subsets=None, max_retries=1000))]
+#[pyo3(signature = (crawl, data_type, dst, subsets=None, max_retries=1000))]
 fn download_paths(
     py: Python<'_>,
-    snapshot: String,
+    crawl: String,
     data_type: String,
     dst: String,
     subsets: Option<Vec<String>>,
@@ -34,7 +34,7 @@ fn download_paths(
         let rt = Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async {
             let options = DownloadOptions {
-                snapshot,
+                crawl,
                 data_type: &data_type,
                 dst: std::path::Path::new(&dst),
                 cc_index_table_subsets: subsets.unwrap_or_default(),

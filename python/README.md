@@ -20,14 +20,14 @@ uv add cc-downloader
 
 ## Quick start
 
-The workflow has two steps: fetch a paths index for a crawl snapshot, then download every file it lists.
+The workflow has two steps: fetch a paths index for a crawl archive, then download every file it lists.
 
 ```python
 import cc_downloader
 
 # Step 1: download the paths index for WET files.
 cc_downloader.download_paths(
-    snapshot="CC-MAIN-2024-46",
+    crawl="CC-MAIN-2024-46",
     data_type="wet",
     dst="./output",
 )

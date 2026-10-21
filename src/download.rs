@@ -45,7 +45,7 @@ async fn rate_limit_acquire(limiter: &Ratelimiter) {
 /// use cc_downloader::download::DownloadOptions;
 ///
 /// let options = DownloadOptions {
-///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2024-46".to_string(),
 ///     data_type: "wet",
 ///     dst: std::path::Path::new("./output"),
 ///     ..Default::default()
@@ -53,8 +53,8 @@ async fn rate_limit_acquire(limiter: &Ratelimiter) {
 /// ```
 #[derive(Clone, Debug)]
 pub struct DownloadOptions<'a> {
-    /// Crawl snapshot identifier, e.g. `"CC-MAIN-2024-46"` or `"CC-NEWS-2025-01"`.
-    pub snapshot: String,
+    /// Crawl archive identifier, e.g. `"CC-MAIN-2024-46"` or `"CC-NEWS-2025-01"`.
+    pub crawl: String,
     /// Data type to download, e.g. `"warc"`, `"wet"`, `"cc-index-table"`.
     pub data_type: &'a str,
     /// Path to a `.paths.gz` file that lists the files to download.
@@ -94,7 +94,7 @@ struct TaskOptions {
 impl Default for DownloadOptions<'_> {
     fn default() -> Self {
         DownloadOptions {
-            snapshot: "".to_string(),
+            crawl: "".to_string(),
             data_type: "",
             paths: Path::new(""),
             dst: Path::new(""),
@@ -111,7 +111,7 @@ impl Default for DownloadOptions<'_> {
 impl<'a> DownloadOptions<'a> {
     /// Creates a `DownloadOptions` with sensible defaults for downloading data files.
     ///
-    /// Validates `snapshot` against the expected crawl name format
+    /// Validates `crawl` against the expected crawl name format
     /// (`CC-MAIN-YYYY-WW` or `CC-NEWS-YYYY-MM`) and exits the process with an
     /// error message if the format is invalid.
     ///
@@ -134,7 +134,7 @@ impl<'a> DownloadOptions<'a> {
     /// options.set_threads(5);
     /// ```
     pub fn new(
-        snapshot: &'a str,
+        crawl: &'a str,
         data_type: &'a str,
         paths: &'a str,
         dst: &'a str,
@@ -142,13 +142,13 @@ impl<'a> DownloadOptions<'a> {
         files_only: bool,
         progress: bool,
     ) -> Self {
-        // Validate the snapshot format
-        let snapshot = crawl_name_format(snapshot).unwrap_or_else(|err| {
+        // Validate the crawl archive identifier format
+        let crawl = crawl_name_format(crawl).unwrap_or_else(|err| {
             eprintln!("Error: {err}");
             process::exit(1);
         });
         DownloadOptions {
-            snapshot,
+            crawl,
             data_type,
             paths: Path::new(paths),
             dst: Path::new(dst),
@@ -239,7 +239,7 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
 /// Downloads a paths file directly from a contributor dataset URL.
 ///
 /// Unlike [`download_paths`], this function accepts an arbitrary URL rather
-/// than constructing one from a snapshot and data type. The URL should point
+/// than constructing one from a crawl archive identifier and data type. The URL should point
 /// to a gzip-compressed paths file hosted under
 /// `https://data.commoncrawl.org/contrib/`.
 ///
@@ -317,9 +317,9 @@ pub async fn download_contrib_paths(
     Ok(())
 }
 
-/// Downloads the paths index file for a Common Crawl snapshot and data type.
+/// Downloads the paths index file for a Common Crawl crawl archive and data type.
 ///
-/// Constructs the URL from `options.snapshot` and `options.data_type`, performs
+/// Constructs the URL from `options.crawl` and `options.data_type`, performs
 /// a HEAD request to verify the resource exists (returning a descriptive error
 /// for 404s), then streams the gzip-compressed file to `options.dst`.
 ///
@@ -345,7 +345,7 @@ pub async fn download_contrib_paths(
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
 /// let options = DownloadOptions {
-///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2024-46".to_string(),
 ///     data_type: "wet",
 ///     dst: std::path::Path::new("./output"),
 ///     ..Default::default()
@@ -363,7 +363,7 @@ pub async fn download_contrib_paths(
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
 /// let options = DownloadOptions {
-///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2024-46".to_string(),
 ///     data_type: "cc-index-table",
 ///     dst: std::path::Path::new("./output"),
 ///     cc_index_table_subsets: vec!["warc".to_string(), "robotstxt".to_string()],
@@ -376,18 +376,18 @@ pub async fn download_contrib_paths(
 pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
 
-    // Check if the snapshot is a news snapshot and reformat it
+    // Check if the crawl identifier is a news crawl and reformat it
     // The format of the main crawl urls is different from the news crawl urls
     // https://data.commoncrawl.org/crawl-data/CC-NEWS/2025/01/warc.paths.gz
     // https://data.commoncrawl.org/crawl-data/CC-MAIN-2025-08/warc.paths.gz
-    let snapshot_original_ref = options.snapshot.clone();
-    if news_re.is_match(&options.snapshot) {
-        let caps = news_re.captures(&options.snapshot).unwrap();
-        options.snapshot = format!("{}/{}/{}", &caps[1], &caps[2], &caps[3]);
+    let crawl_original_ref = options.crawl.clone();
+    if news_re.is_match(&options.crawl) {
+        let caps = news_re.captures(&options.crawl).unwrap();
+        options.crawl = format!("{}/{}/{}", &caps[1], &caps[2], &caps[3]);
     }
     let paths = format!(
         "{}crawl-data/{}/{}.paths.gz",
-        BASE_URL, options.snapshot, options.data_type
+        BASE_URL, options.crawl, options.data_type
     );
     println!("Downloading paths from: {paths}");
     let url = Url::parse(&paths)?;
@@ -405,7 +405,7 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
         status if status.as_u16() == 404 => {
             return Err(format!(
                 "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tSUBSET: {}\n\tURL: {}\n\nDoesn't seem to exist or it is currently not accessible.\n\tError code: {} {}",
-                snapshot_original_ref, options.data_type, url, status.as_str(), status.canonical_reason().unwrap_or("")
+                crawl_original_ref, options.data_type, url, status.as_str(), status.canonical_reason().unwrap_or("")
             )
             .into());
         }

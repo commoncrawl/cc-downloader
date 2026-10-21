@@ -12,7 +12,7 @@ async fn main() -> ExitCode {
     match cli.command {
         Commands::DownloadPaths { source } => match source {
             DownloadPathsSource::Crawl {
-                snapshot,
+                crawl,
                 data_type,
                 dst,
                 subsets,
@@ -22,7 +22,7 @@ async fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
                 let options = download::DownloadOptions {
-                    snapshot: snapshot.to_string(),
+                    crawl: crawl.to_string(),
                     data_type: data_type.as_str(),
                     dst: &dst,
                     cc_index_table_subsets: subsets
