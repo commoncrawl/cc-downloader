@@ -60,7 +60,7 @@ pub enum Commands {
 pub enum DownloadPathsSource {
     /// Download paths for a standard crawl archive
     Crawl {
-        /// Crawl archive identifier, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
+        /// Crawl archive identifier, e.g. CC-MAIN-2026-39 or CC-NEWS-2026-09
         #[arg(value_name = "CRAWL", value_parser = crawl_name_format)]
         crawl: String,
 

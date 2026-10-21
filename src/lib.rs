@@ -18,7 +18,7 @@
 //! async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
 //!     // Step 1: fetch the paths index for WET files from a crawl archive.
 //!     let paths_options = DownloadOptions {
-//!         crawl: "CC-MAIN-2024-46".to_string(),
+//!         crawl: "CC-MAIN-2026-39".to_string(),
 //!         data_type: "wet",
 //!         dst: std::path::Path::new("./output"),
 //!         ..Default::default()

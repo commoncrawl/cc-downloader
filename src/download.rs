@@ -45,7 +45,7 @@ async fn rate_limit_acquire(limiter: &Ratelimiter) {
 /// use cc_downloader::download::DownloadOptions;
 ///
 /// let options = DownloadOptions {
-///     crawl: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2026-39".to_string(),
 ///     data_type: "wet",
 ///     dst: std::path::Path::new("./output"),
 ///     ..Default::default()
@@ -53,7 +53,7 @@ async fn rate_limit_acquire(limiter: &Ratelimiter) {
 /// ```
 #[derive(Clone, Debug)]
 pub struct DownloadOptions<'a> {
-    /// Crawl archive identifier, e.g. `"CC-MAIN-2024-46"` or `"CC-NEWS-2025-01"`.
+    /// Crawl archive identifier, e.g. `"CC-MAIN-2026-39"` or `"CC-NEWS-2026-09"`.
     pub crawl: String,
     /// Data type to download, e.g. `"warc"`, `"wet"`, `"cc-index-table"`.
     pub data_type: &'a str,
@@ -123,7 +123,7 @@ impl<'a> DownloadOptions<'a> {
     /// use cc_downloader::download::DownloadOptions;
     ///
     /// let mut options = DownloadOptions::new(
-    ///     "CC-MAIN-2024-46",
+    ///     "CC-MAIN-2026-39",
     ///     "wet",
     ///     "./output/wet.paths.gz",
     ///     "./output",
@@ -345,7 +345,7 @@ pub async fn download_contrib_paths(
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
 /// let options = DownloadOptions {
-///     crawl: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2026-39".to_string(),
 ///     data_type: "wet",
 ///     dst: std::path::Path::new("./output"),
 ///     ..Default::default()
@@ -363,7 +363,7 @@ pub async fn download_contrib_paths(
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
 /// let options = DownloadOptions {
-///     crawl: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2026-39".to_string(),
 ///     data_type: "cc-index-table",
 ///     dst: std::path::Path::new("./output"),
 ///     cc_index_table_subsets: vec!["warc".to_string(), "robotstxt".to_string()],
@@ -378,8 +378,8 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
 
     // Check if the crawl identifier is a news crawl and reformat it
     // The format of the main crawl urls is different from the news crawl urls
-    // https://data.commoncrawl.org/crawl-data/CC-NEWS/2025/01/warc.paths.gz
-    // https://data.commoncrawl.org/crawl-data/CC-MAIN-2025-08/warc.paths.gz
+    // https://data.commoncrawl.org/crawl-data/CC-NEWS/2026/09/warc.paths.gz
+    // https://data.commoncrawl.org/crawl-data/CC-MAIN-2026-39/warc.paths.gz
     let crawl_original_ref = options.crawl.clone();
     if news_re.is_match(&options.crawl) {
         let caps = news_re.captures(&options.crawl).unwrap();

@@ -198,7 +198,7 @@ Download paths for a standard crawl archive
 Usage: cc-downloader download-paths crawl [OPTIONS] <CRAWL> <DATA_TYPE> <DESTINATION>
 
 Arguments:
-  <CRAWL>        Crawl archive identifier, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
+  <CRAWL>        Crawl archive identifier, e.g. CC-MAIN-2026-39 or CC-NEWS-2026-09
   <DATA_TYPE>    Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
   <DESTINATION>  Destination folder
 

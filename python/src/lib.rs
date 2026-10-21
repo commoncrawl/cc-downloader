@@ -12,8 +12,8 @@ use tokio::runtime::Runtime;
 /// ``"crawldiagnostics"``, ``"robotstxt"``, and ``"warc"``. Omit `subsets`
 /// (or pass ``None``) to download all three.
 ///
-/// :param crawl: Crawl archive identifier, e.g. ``"CC-MAIN-2024-46"``
-///     or ``"CC-NEWS-2025-01"``.
+/// :param crawl: Crawl archive identifier, e.g. ``"CC-MAIN-2026-39"``
+///     or ``"CC-NEWS-2026-09"``.
 /// :param data_type: Data type to download, e.g. ``"warc"``, ``"wet"``,
 ///     ``"cc-index-table"``.
 /// :param dst: Destination directory where the paths file will be written.

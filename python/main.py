@@ -4,7 +4,7 @@ import cc_downloader
 
 # Step 1: download the paths index for WET files
 cc_downloader.download_paths(
-    crawl="CC-MAIN-2024-46",
+    crawl="CC-MAIN-2026-39",
     data_type="wet",
     dst="./output",
 )
@@ -19,7 +19,7 @@ cc_downloader.download(
 
 # --- cc-index-table: only the warc and robotstxt subsets ---
 cc_downloader.download_paths(
-    crawl="CC-MAIN-2024-46",
+    crawl="CC-MAIN-2026-39",
     data_type="cc-index-table",
     dst="./output",
     subsets=["warc", "robotstxt"],
