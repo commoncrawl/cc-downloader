@@ -58,11 +58,11 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum DownloadPathsSource {
-    /// Download paths for a standard crawl snapshot
+    /// Download paths for a standard crawl archive
     Crawl {
-        /// Crawl reference, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
+        /// Crawl archive identifier, e.g. CC-MAIN-2026-39 or CC-NEWS-2026-09
         #[arg(value_name = "CRAWL", value_parser = crawl_name_format)]
-        snapshot: String,
+        crawl: String,
 
         /// Data type
         #[arg(value_name = "DATA_TYPE")]

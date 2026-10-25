@@ -20,14 +20,14 @@ uv add cc-downloader
 
 ## Quick start
 
-The workflow has two steps: fetch a paths index for a crawl snapshot, then download every file it lists.
+The workflow has two steps: fetch a paths index for a crawl archive, then download every file it lists.
 
 ```python
 import cc_downloader
 
 # Step 1: download the paths index for WET files.
 cc_downloader.download_paths(
-    snapshot="CC-MAIN-2024-46",
+    crawl="CC-MAIN-2026-39",
     data_type="wet",
     dst="./output",
 )
@@ -47,7 +47,7 @@ cc_downloader.download(
 
 ```python
 cc_downloader.download_paths(
-    snapshot: str,
+    crawl: str,
     data_type: str,
     dst: str,
     subsets: list[str] | None = None,
@@ -55,11 +55,11 @@ cc_downloader.download_paths(
 ) -> None
 ```
 
-Downloads the gzip-compressed paths index file for a given crawl snapshot and data type to `dst`.
+Downloads the gzip-compressed paths index file for a given crawl archive and data type to `dst`.
 
 | Parameter | Description |
 | --- | --- |
-| `snapshot` | Crawl identifier, e.g. `"CC-MAIN-2024-46"` or `"CC-NEWS-2025-01"` |
+| `crawl` | Crawl identifier, e.g. `"CC-MAIN-2026-39"` or `"CC-NEWS-2026-09"` |
 | `data_type` | Data type: `"warc"`, `"wet"`, `"wat"`, `"robotstxt"`, `"non200responses"`, `"cc-index"`, `"cc-index-table"` |
 | `dst` | Destination directory |
 | `subsets` | For `cc-index-table` only: list of subsets to keep. Valid values: `"crawldiagnostics"`, `"robotstxt"`, `"warc"`. Defaults to all three. |
@@ -69,7 +69,7 @@ Downloads the gzip-compressed paths index file for a given crawl snapshot and da
 
 ```python
 cc_downloader.download_paths(
-    snapshot="CC-MAIN-2024-46",
+    crawl="CC-MAIN-2026-39",
     data_type="cc-index-table",
     dst="./output",
     subsets=["warc", "robotstxt"],
