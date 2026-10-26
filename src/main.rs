@@ -15,11 +15,15 @@ async fn main() -> ExitCode {
                 crawl,
                 data_type,
                 dst,
-                subsets,
+                mut subsets,
+                trailing_subsets,
             } => {
+                subsets.extend(trailing_subsets);
+                subsets.sort();
+                subsets.dedup();
                 if !subsets.is_empty() && data_type != DataType::CcIndexTable {
                     eprintln!("Error: --subset is only valid with the `cc-index-table` data type");
-                    return ExitCode::FAILURE;
+                    return ExitCode::from(2);
                 }
                 let options = download::DownloadOptions {
                     crawl: crawl.to_string(),
