@@ -10,7 +10,7 @@ fn missing_paths_file_exits_with_failure() {
         .args(["download", "does-not-exist.paths.gz", "out"])
         .status()
         .unwrap();
-    assert_eq!(status.code(), Some(1));
+    assert_eq!(status.code(), Some(2));
 }
 
 #[test]

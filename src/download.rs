@@ -227,7 +227,7 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
         .retry_bounds(Duration::from_secs(1), Duration::from_secs(3600))
         .jitter(Jitter::Bounded)
         .base(2)
-        .build_with_max_retries(u32::try_from(max_retries).unwrap());
+        .build_with_max_retries(u32::try_from(max_retries).unwrap_or(u32::MAX));
 
     let client_base = Client::builder().user_agent(APP_USER_AGENT).build()?;
 
@@ -404,7 +404,7 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
         status if status.is_success() => (),
         status if status.as_u16() == 404 => {
             return Err(format!(
-                "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tSUBSET: {}\n\tURL: {}\n\nDoesn't seem to exist or it is currently not accessible.\n\tError code: {} {}",
+                "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tDATA TYPE: {}\n\tURL: {}\n\nDoesn't seem to exist or it is currently not accessible.\n\tError code: {} {}",
                 crawl_original_ref, options.data_type, url, status.as_str(), status.canonical_reason().unwrap_or("")
             )
             .into());

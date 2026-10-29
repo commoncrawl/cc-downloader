@@ -36,7 +36,7 @@ cc-downloader download path/to/folder/wet.paths.gz path/to/folder
 For `cc-index-table` data you can optionally filter to one or more subsets (`crawldiagnostics`, `robotstxt`, `warc`). Without `--subset` all three are downloaded:
 
 ```bash
-cc-downloader download-paths crawl CC-MAIN-2026-39 cc-index-table path/to/folder --subset warc robotstxt
+cc-downloader download-paths crawl --subset warc,robotstxt CC-MAIN-2026-39 cc-index-table path/to/folder
 ```
 
 To download paths from a [contributor dataset](https://data.commoncrawl.org/contrib/index.html), use the `contrib` subcommand with the direct URL to the paths file:
@@ -192,7 +192,7 @@ Options:
 
 ------
 
-➜ cc-downloader download-paths crawl -h
+➜ cc-downloader download-paths crawl -h                                                       
 Download paths for a standard crawl archive
 
 Usage: cc-downloader download-paths crawl [OPTIONS] <CRAWL> <DATA_TYPE> <DESTINATION>
@@ -203,9 +203,8 @@ Arguments:
   <DESTINATION>  Destination folder
 
 Options:
-      --subset <SUBSETS>...  Subsets to download (only valid for cc-index-table). Defaults to all three if omitted: crawldiagnostics, robotstxt, warc [possible values: crawldiagnostics, robotstxt, warc]
-  -h, --help                 Print help
-
+      --subset <SUBSET>  Subsets to download (only valid for cc-index-table). Repeat the flag or separate values with commas, e.g. --subset warc,robotstxt. Defaults to all three if omitted: crawldiagnostics, robotstxt, warc [possible values: crawldiagnostics, robotstxt, warc]
+  -h, --help             Print help
 ------
 
 ➜ cc-downloader download-paths contrib -h
