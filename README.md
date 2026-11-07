@@ -249,7 +249,7 @@ The number of threads can be set using the `-t` flag. The default value is 10. I
 
 ```toml
 [dependencies]
-cc-downloader = "1.0.1"
+cc-downloader = "1.1.0"
 tokio = { version = "1.52.1", features = ["full"] }
 ```
 

@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "cc-downloader"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "clap",
  "flate2",
@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "cc-downloader-python"
-version = "0.1.1"
+version = "1.1.0"
 dependencies = [
  "cc-downloader",
  "pyo3",
