@@ -3,7 +3,7 @@
 //! The library implements a two-step workflow that mirrors the CLI:
 //!
 //! 1. **Fetch the index** — download a `.paths.gz` file that lists every file
-//!    in a crawl snapshot for a given data type.
+//!    in a crawl archive for a given data type.
 //! 2. **Download the data** — read that index and download every file it lists,
 //!    concurrently, with exponential-backoff retries.
 //!
@@ -16,9 +16,9 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
-//!     // Step 1: fetch the paths index for WET files from a crawl snapshot.
+//!     // Step 1: fetch the paths index for WET files from a crawl archive.
 //!     let paths_options = DownloadOptions {
-//!         snapshot: "CC-MAIN-2024-46".to_string(),
+//!         crawl: "CC-MAIN-2026-39".to_string(),
 //!         data_type: "wet",
 //!         dst: std::path::Path::new("./output"),
 //!         ..Default::default()
@@ -42,7 +42,7 @@
 //! # Contributor datasets
 //!
 //! For datasets hosted under `https://data.commoncrawl.org/contrib/` that don't
-//! follow the standard snapshot/data-type schema, use
+//! follow the standard crawl/data-type schema, use
 //! [`download::download_contrib_paths`] instead of [`download::download_paths`]:
 //!
 //! ```no_run

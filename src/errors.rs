@@ -15,7 +15,7 @@ use std::fmt;
 /// # #[tokio::main]
 /// # async fn main() {
 /// let options = DownloadOptions {
-///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2026-39".to_string(),
 ///     data_type: "wet",
 ///     dst: std::path::Path::new("./output"),
 ///     ..Default::default()
@@ -41,7 +41,7 @@ pub enum DownloadError {
     Indicatif(indicatif::style::TemplateError),
     /// A task join error from the async runtime.
     Join(tokio::task::JoinError),
-    /// A domain-level error, e.g. an unrecognised snapshot reference or an
+    /// A domain-level error, e.g. an unrecognised crawl archive identifier or an
     /// inaccessible paths URL. The inner `String` contains the full message
     /// printed to the user.
     Custom(String),

@@ -31,10 +31,10 @@ def _run_in_subprocess(fn, args, kwargs):
         )
 
 
-def download_paths(snapshot, data_type, dst, subsets=None, max_retries=1000):
+def download_paths(crawl, data_type, dst, subsets=None, max_retries=1000):
     _run_in_subprocess(
         _download_paths,
-        (snapshot, data_type, dst),
+        (crawl, data_type, dst),
         {"subsets": subsets, "max_retries": max_retries},
     )
 

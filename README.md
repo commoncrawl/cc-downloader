@@ -2,7 +2,7 @@
 
 A polite and user-friendly command-line tool for downloading [Common Crawl](https://commoncrawl.org) data, written in Rust.
 
-Common Crawl has seen a significant increase in data downloads in recent months, which has made it difficult for some users to successfully retrieve data from the storage bucket. CC-Downloader was built to address this: it implements a polite retry mechanism with exponential backoff and jitter to avoid overwhelming the infrastructure, while ensuring that every requested file is downloaded successfully.
+Common Crawl has seen a significant increase in data downloads in recent months, which has made it difficult for some users to successfully retrieve data from the storage bucket. `cc-downloader` was built to address this: it implements a polite retry mechanism with exponential backoff and jitter to avoid overwhelming the infrastructure, while ensuring that every requested file is downloaded successfully.
 
 Key features:
 
@@ -24,7 +24,7 @@ cargo install cc-downloader
 The workflow has two steps. First, download the file paths for a given crawl and data type:
 
 ```bash
-cc-downloader download-paths crawl CC-MAIN-2024-46 wet path/to/folder
+cc-downloader download-paths crawl CC-MAIN-2026-39 wet path/to/folder
 ```
 
 This produces a `wet.paths.gz` file. Then, download the actual data:
@@ -36,7 +36,7 @@ cc-downloader download path/to/folder/wet.paths.gz path/to/folder
 For `cc-index-table` data you can optionally filter to one or more subsets (`crawldiagnostics`, `robotstxt`, `warc`). Without `--subset` all three are downloaded:
 
 ```bash
-cc-downloader download-paths crawl CC-MAIN-2024-46 cc-index-table path/to/folder --subset warc robotstxt
+cc-downloader download-paths crawl --subset warc,robotstxt CC-MAIN-2026-39 cc-index-table path/to/folder
 ```
 
 To download paths from a [contributor dataset](https://data.commoncrawl.org/contrib/index.html), use the `contrib` subcommand with the direct URL to the paths file:
@@ -51,7 +51,7 @@ You can install `cc-downloader` via our pre-built binaries, or by compiling it f
 
 ### Pre-built binaries
 
-You can find our pre-built binaries on our [GitHub releases page](https://github.com/commoncrawl/cc-downloader/releases). They are available for `Linux`, `macOS`, and `Windows`, in `x86_64` and `aarch64` architectures (Windows is only supported in `x86_64`). In order to use them please select and download the correct binary for your system.
+You can find our pre-built binaries on our [GitHub releases page](https://github.com/commoncrawl/cc-downloader/releases). They are available for `Linux`, `macOS`, and `Windows`, in `x86_64` and `aarch64` architectures. In order to use them please select and download the correct binary for your system.
 
 ```bash
 wget https://github.com/commoncrawl/cc-downloader/releases/download/[VERSION]/cc-downloader-[VERSION]-[ARCH]-[OS].[COMPRESSION-FORMAT]
@@ -183,7 +183,7 @@ Download paths for a given crawl and data type, or from a contributor dataset
 Usage: cc-downloader download-paths <COMMAND>
 
 Commands:
-  crawl    Download paths for a standard crawl snapshot
+  crawl    Download paths for a standard crawl archive
   contrib  Download paths from a contributor dataset
   help     Print this message or the help of the given subcommand(s)
 
@@ -192,20 +192,19 @@ Options:
 
 ------
 
-➜ cc-downloader download-paths crawl -h
-Download paths for a standard crawl snapshot
+➜ cc-downloader download-paths crawl -h                                                       
+Download paths for a standard crawl archive
 
 Usage: cc-downloader download-paths crawl [OPTIONS] <CRAWL> <DATA_TYPE> <DESTINATION>
 
 Arguments:
-  <CRAWL>        Crawl reference, e.g. CC-MAIN-2021-04 or CC-NEWS-2025-01
+  <CRAWL>        Crawl archive identifier, e.g. CC-MAIN-2026-39 or CC-NEWS-2026-09
   <DATA_TYPE>    Data type [possible values: segment, warc, wat, wet, robotstxt, non200responses, cc-index, cc-index-table]
   <DESTINATION>  Destination folder
 
 Options:
-      --subset <SUBSETS>...  Subsets to download (only valid for cc-index-table). Defaults to all three if omitted: crawldiagnostics, robotstxt, warc [possible values: crawldiagnostics, robotstxt, warc]
-  -h, --help                 Print help
-
+      --subset <SUBSET>  Subsets to download (only valid for cc-index-table). Repeat the flag or separate values with commas, e.g. --subset warc,robotstxt. Defaults to all three if omitted: crawldiagnostics, robotstxt, warc [possible values: crawldiagnostics, robotstxt, warc]
+  -h, --help             Print help
 ------
 
 ➜ cc-downloader download-paths contrib -h
@@ -250,8 +249,8 @@ The number of threads can be set using the `-t` flag. The default value is 10. I
 
 ```toml
 [dependencies]
-cc-downloader = "0.6"
-tokio = { version = "1", features = ["full"] }
+cc-downloader = "1.1.0"
+tokio = { version = "1.52.1", features = ["full"] }
 ```
 
 The workflow mirrors the CLI: fetch a paths index first, then download the listed files.
@@ -263,7 +262,7 @@ use cc_downloader::download::{DownloadOptions, download_paths, download};
 async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
     // Step 1: fetch the paths index for WET files.
     let paths_options = DownloadOptions {
-        snapshot: "CC-MAIN-2024-46".to_string(),
+        crawl: "CC-MAIN-2026-39".to_string(),
         data_type: "wet",
         dst: std::path::Path::new("./output"),
         ..Default::default()
@@ -288,7 +287,7 @@ For `cc-index-table`, filter to specific subsets via `cc_index_table_subsets`:
 
 ```rust
 let options = DownloadOptions {
-    snapshot: "CC-MAIN-2024-46".to_string(),
+    crawl: "CC-MAIN-2026-39".to_string(),
     data_type: "cc-index-table",
     dst: std::path::Path::new("./output"),
     cc_index_table_subsets: vec!["warc".to_string(), "robotstxt".to_string()],

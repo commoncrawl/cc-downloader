@@ -45,7 +45,7 @@ async fn rate_limit_acquire(limiter: &Ratelimiter) {
 /// use cc_downloader::download::DownloadOptions;
 ///
 /// let options = DownloadOptions {
-///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2026-39".to_string(),
 ///     data_type: "wet",
 ///     dst: std::path::Path::new("./output"),
 ///     ..Default::default()
@@ -53,8 +53,8 @@ async fn rate_limit_acquire(limiter: &Ratelimiter) {
 /// ```
 #[derive(Clone, Debug)]
 pub struct DownloadOptions<'a> {
-    /// Crawl snapshot identifier, e.g. `"CC-MAIN-2024-46"` or `"CC-NEWS-2025-01"`.
-    pub snapshot: String,
+    /// Crawl archive identifier, e.g. `"CC-MAIN-2026-39"` or `"CC-NEWS-2026-09"`.
+    pub crawl: String,
     /// Data type to download, e.g. `"warc"`, `"wet"`, `"cc-index-table"`.
     pub data_type: &'a str,
     /// Path to a `.paths.gz` file that lists the files to download.
@@ -94,7 +94,7 @@ struct TaskOptions {
 impl Default for DownloadOptions<'_> {
     fn default() -> Self {
         DownloadOptions {
-            snapshot: "".to_string(),
+            crawl: "".to_string(),
             data_type: "",
             paths: Path::new(""),
             dst: Path::new(""),
@@ -111,7 +111,7 @@ impl Default for DownloadOptions<'_> {
 impl<'a> DownloadOptions<'a> {
     /// Creates a `DownloadOptions` with sensible defaults for downloading data files.
     ///
-    /// Validates `snapshot` against the expected crawl name format
+    /// Validates `crawl` against the expected crawl name format
     /// (`CC-MAIN-YYYY-WW` or `CC-NEWS-YYYY-MM`) and exits the process with an
     /// error message if the format is invalid.
     ///
@@ -123,7 +123,7 @@ impl<'a> DownloadOptions<'a> {
     /// use cc_downloader::download::DownloadOptions;
     ///
     /// let mut options = DownloadOptions::new(
-    ///     "CC-MAIN-2024-46",
+    ///     "CC-MAIN-2026-39",
     ///     "wet",
     ///     "./output/wet.paths.gz",
     ///     "./output",
@@ -134,7 +134,7 @@ impl<'a> DownloadOptions<'a> {
     /// options.set_threads(5);
     /// ```
     pub fn new(
-        snapshot: &'a str,
+        crawl: &'a str,
         data_type: &'a str,
         paths: &'a str,
         dst: &'a str,
@@ -142,13 +142,13 @@ impl<'a> DownloadOptions<'a> {
         files_only: bool,
         progress: bool,
     ) -> Self {
-        // Validate the snapshot format
-        let snapshot = crawl_name_format(snapshot).unwrap_or_else(|err| {
+        // Validate the crawl archive identifier format
+        let crawl = crawl_name_format(crawl).unwrap_or_else(|err| {
             eprintln!("Error: {err}");
             process::exit(1);
         });
         DownloadOptions {
-            snapshot,
+            crawl,
             data_type,
             paths: Path::new(paths),
             dst: Path::new(dst),
@@ -227,7 +227,7 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
         .retry_bounds(Duration::from_secs(1), Duration::from_secs(3600))
         .jitter(Jitter::Bounded)
         .base(2)
-        .build_with_max_retries(u32::try_from(max_retries).unwrap());
+        .build_with_max_retries(u32::try_from(max_retries).unwrap_or(u32::MAX));
 
     let client_base = Client::builder().user_agent(APP_USER_AGENT).build()?;
 
@@ -239,7 +239,7 @@ fn new_client(max_retries: usize) -> Result<ClientWithMiddleware, DownloadError>
 /// Downloads a paths file directly from a contributor dataset URL.
 ///
 /// Unlike [`download_paths`], this function accepts an arbitrary URL rather
-/// than constructing one from a snapshot and data type. The URL should point
+/// than constructing one from a crawl archive identifier and data type. The URL should point
 /// to a gzip-compressed paths file hosted under
 /// `https://data.commoncrawl.org/contrib/`.
 ///
@@ -317,9 +317,9 @@ pub async fn download_contrib_paths(
     Ok(())
 }
 
-/// Downloads the paths index file for a Common Crawl snapshot and data type.
+/// Downloads the paths index file for a Common Crawl crawl archive and data type.
 ///
-/// Constructs the URL from `options.snapshot` and `options.data_type`, performs
+/// Constructs the URL from `options.crawl` and `options.data_type`, performs
 /// a HEAD request to verify the resource exists (returning a descriptive error
 /// for 404s), then streams the gzip-compressed file to `options.dst`.
 ///
@@ -345,7 +345,7 @@ pub async fn download_contrib_paths(
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
 /// let options = DownloadOptions {
-///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2026-39".to_string(),
 ///     data_type: "wet",
 ///     dst: std::path::Path::new("./output"),
 ///     ..Default::default()
@@ -363,7 +363,7 @@ pub async fn download_contrib_paths(
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), cc_downloader::errors::DownloadError> {
 /// let options = DownloadOptions {
-///     snapshot: "CC-MAIN-2024-46".to_string(),
+///     crawl: "CC-MAIN-2026-39".to_string(),
 ///     data_type: "cc-index-table",
 ///     dst: std::path::Path::new("./output"),
 ///     cc_index_table_subsets: vec!["warc".to_string(), "robotstxt".to_string()],
@@ -376,18 +376,18 @@ pub async fn download_contrib_paths(
 pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), DownloadError> {
     let news_re = Regex::new(r"^(CC\-NEWS)\-([0-9]{4})\-([0-9]{2})$").unwrap();
 
-    // Check if the snapshot is a news snapshot and reformat it
+    // Check if the crawl identifier is a news crawl and reformat it
     // The format of the main crawl urls is different from the news crawl urls
-    // https://data.commoncrawl.org/crawl-data/CC-NEWS/2025/01/warc.paths.gz
-    // https://data.commoncrawl.org/crawl-data/CC-MAIN-2025-08/warc.paths.gz
-    let snapshot_original_ref = options.snapshot.clone();
-    if news_re.is_match(&options.snapshot) {
-        let caps = news_re.captures(&options.snapshot).unwrap();
-        options.snapshot = format!("{}/{}/{}", &caps[1], &caps[2], &caps[3]);
+    // https://data.commoncrawl.org/crawl-data/CC-NEWS/2026/09/warc.paths.gz
+    // https://data.commoncrawl.org/crawl-data/CC-MAIN-2026-39/warc.paths.gz
+    let crawl_original_ref = options.crawl.clone();
+    if news_re.is_match(&options.crawl) {
+        let caps = news_re.captures(&options.crawl).unwrap();
+        options.crawl = format!("{}/{}/{}", &caps[1], &caps[2], &caps[3]);
     }
     let paths = format!(
         "{}crawl-data/{}/{}.paths.gz",
-        BASE_URL, options.snapshot, options.data_type
+        BASE_URL, options.crawl, options.data_type
     );
     println!("Downloading paths from: {paths}");
     let url = Url::parse(&paths)?;
@@ -404,8 +404,8 @@ pub async fn download_paths(mut options: DownloadOptions<'_>) -> Result<(), Down
         status if status.is_success() => (),
         status if status.as_u16() == 404 => {
             return Err(format!(
-                "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tSUBSET: {}\n\tURL: {}\n\nDoesn't seem to exist or it is currently not accessible.\n\tError code: {} {}",
-                snapshot_original_ref, options.data_type, url, status.as_str(), status.canonical_reason().unwrap_or("")
+                "\n\nThe reference combination you requested:\n\tCRAWL: {}\n\tDATA TYPE: {}\n\tURL: {}\n\nDoesn't seem to exist or it is currently not accessible.\n\tError code: {} {}",
+                crawl_original_ref, options.data_type, url, status.as_str(), status.canonical_reason().unwrap_or("")
             )
             .into());
         }
@@ -573,9 +573,11 @@ async fn download_task(
 ///
 /// # Errors
 ///
-/// Returns [`DownloadError`] if the paths file
-/// cannot be opened, or if the progress bar template is invalid. Individual
-/// file errors are printed to stderr but do not abort the remaining downloads.
+/// Returns [`DownloadError`] if the paths file cannot be opened or read, or if
+/// the progress bar template is invalid. Individual file failures do not abort
+/// the remaining downloads: each one is printed to stderr as it happens, and
+/// once every task has finished a [`DownloadError::Custom`] reporting how many
+/// downloads failed is returned.
 ///
 /// # Examples
 ///
@@ -599,29 +601,22 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
     // A vector containing all the URLs to download
 
     let file = {
-        let gzip_file = match File::open(options.paths) {
-            Ok(file) => file,
-            Err(e) => {
-                eprintln!(
-                    "Could not open file {}\nError: {}",
-                    options.paths.display(),
-                    e
-                );
-                process::exit(1)
-            }
-        };
+        let gzip_file = File::open(options.paths).map_err(|e| {
+            DownloadError::Custom(format!(
+                "Could not open file {}: {e}",
+                options.paths.display()
+            ))
+        })?;
         let file_decoded = GzDecoder::new(gzip_file);
         BufReader::new(file_decoded)
     };
 
-    let paths: Vec<(usize, String)> = file
-        .lines()
-        .map(|line| {
-            let line = line.unwrap();
-            format!("{BASE_URL}{line}")
-        })
-        .enumerate()
-        .collect();
+    // A vector containing all the URLs to download
+    let mut paths: Vec<(usize, String)> = Vec::new();
+    for (number, line) in file.lines().enumerate() {
+        paths.push((number, format!("{BASE_URL}{}", line?)));
+    }
+    let total = paths.len();
 
     // Set up a new multi-progress bar.
     // The bar is stored in an `Arc` to facilitate sharing between threads.
@@ -699,25 +694,36 @@ pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError>
     };
 
     // Wait for the tasks to finish.
+    // A task can fail on its own (Ok(Err)) or panic / be cancelled (Err(JoinError)).
+    let mut failed = 0usize;
     while let Some(result) = set.join_next().await {
         match result {
-            Ok(Ok(())) => {}
+            Ok(Ok(())) => continue,
             Ok(Err(e)) => eprintln!("Error: {e:?}"),
             Err(e) => eprintln!("Error: {e:?}"),
         }
+        failed += 1;
     }
 
     if options.progress {
         // Change the message on the overall progress indicator.
-        main_pb.finish_with_message("done");
+        main_pb.finish_with_message(if failed == 0 {
+            "done"
+        } else {
+            "done with errors"
+        });
 
         // Wait for the progress bars to finish rendering.
         // The first ? unwraps the outer join() in which we are waiting for the
         // future spawned by tokio::task::spawn_blocking to finish.
         // The second ? unwraps the inner multibar.join().
         multibar.await?;
-    } else {
+    } else if failed == 0 {
         println!("All downloads completed");
+    }
+
+    if failed > 0 {
+        return Err(format!("{failed} of {total} downloads failed").into());
     }
     Ok(())
 }
