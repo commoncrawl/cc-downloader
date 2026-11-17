@@ -598,7 +598,10 @@ async fn download_task(
 /// # }
 /// ```
 pub async fn download(options: DownloadOptions<'_>) -> Result<(), DownloadError> {
-    // A vector containing all the URLs to download
+    // A semaphore with zero permits would make every task wait forever.
+    if options.threads == 0 {
+        return Err(DownloadError::Custom("threads must be at least 1".to_string()));
+    }
 
     let file = {
         let gzip_file = File::open(options.paths).map_err(|e| {
@@ -755,5 +758,17 @@ mod tests {
         let out: HeadersEcho = response.json().await?;
         assert_eq!(out.headers["User-Agent"], APP_USER_AGENT);
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn zero_threads_is_an_error() {
+        let options = DownloadOptions {
+            paths: Path::new("does-not-exist.paths.gz"),
+            dst: Path::new("out"),
+            threads: 0,
+            ..Default::default()
+        };
+        let err = download(options).await.unwrap_err();
+        assert!(err.to_string().contains("threads must be at least 1"), "{err}");
     }
 }

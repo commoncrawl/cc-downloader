@@ -34,6 +34,9 @@ pub enum Commands {
 
         ///Enumerate output files for compatibility with Ungoliant Pipeline. This only works for WET files
         #[arg(short, long)]
+        numbered: bool,
+
+        /// Number of threads to use
         #[arg(
             short,
             long,
@@ -41,9 +44,6 @@ pub enum Commands {
             value_name = "NUMBER OF THREADS",
             value_parser = clap::builder::RangedU64ValueParser::<usize>::new().range(1..)
         )]
-        numbered: bool,
-
-        /// Number of threads to use
         threads: usize,
 
         /// Maximum number of retries per file
@@ -207,6 +207,46 @@ mod tests {
     #[test]
     fn cli_definition_is_valid() {
         Cli::command().debug_assert();
+    }
+
+    /// Returns `(threads, numbered, files_only)` for a `download` invocation.
+    fn parse_download(args: &[&str]) -> Result<(usize, bool, bool), clap::Error> {
+        let argv = ["cc-downloader", "download"].iter().chain(args).copied();
+        match Cli::try_parse_from(argv)?.command {
+            Commands::Download {
+                threads,
+                numbered,
+                files_only,
+                ..
+            } => Ok((threads, numbered, files_only)),
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn download_defaults() {
+        assert_eq!(parse_download(&["p", "d"]).unwrap(), (10, false, false));
+    }
+
+    #[test]
+    fn download_threads_flag() {
+        assert_eq!(parse_download(&["-t", "5", "p", "d"]).unwrap().0, 5);
+        assert_eq!(parse_download(&["p", "d", "--threads", "3"]).unwrap().0, 3);
+    }
+
+    #[test]
+    fn download_zero_threads_is_rejected() {
+        assert!(parse_download(&["-t", "0", "p", "d"]).is_err());
+    }
+
+    #[test]
+    fn download_threads_is_not_positional() {
+        assert!(parse_download(&["p", "d", "5"]).is_err());
+    }
+
+    #[test]
+    fn download_numbered_is_a_flag() {
+        assert_eq!(parse_download(&["-n", "p", "d"]).unwrap(), (10, true, false));
     }
 
     #[test]
