@@ -1,27 +1,32 @@
 use clap::Parser;
+use std::process::ExitCode;
 
 use crate::cli::{Commands, DataType, DownloadPathsSource};
 use cc_downloader::download;
 mod cli;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     let cli = cli::Cli::parse();
 
     match cli.command {
         Commands::DownloadPaths { source } => match source {
             DownloadPathsSource::Crawl {
-                snapshot,
+                crawl,
                 data_type,
                 dst,
-                subsets,
+                mut subsets,
+                trailing_subsets,
             } => {
+                subsets.extend(trailing_subsets);
+                subsets.sort();
+                subsets.dedup();
                 if !subsets.is_empty() && data_type != DataType::CcIndexTable {
                     eprintln!("Error: --subset is only valid with the `cc-index-table` data type");
-                    std::process::exit(1);
+                    return ExitCode::from(2);
                 }
                 let options = download::DownloadOptions {
-                    snapshot: snapshot.to_string(),
+                    crawl: crawl.to_string(),
                     data_type: data_type.as_str(),
                     dst: &dst,
                     cc_index_table_subsets: subsets
@@ -30,15 +35,15 @@ async fn main() {
                         .collect(),
                     ..Default::default()
                 };
-                match download::download_paths(options).await {
-                    Ok(_) => (),
-                    Err(e) => eprintln!("Error downloading paths: {e}"),
+                if let Err(e) = download::download_paths(options).await {
+                    eprintln!("Error downloading paths: {e}");
+                    return ExitCode::FAILURE;
                 }
             }
             DownloadPathsSource::Contrib { url, dst } => {
-                match download::download_contrib_paths(&url, &dst, 1000).await {
-                    Ok(_) => (),
-                    Err(e) => eprintln!("Error downloading contrib paths: {e}"),
+                if let Err(e) = download::download_contrib_paths(&url, &dst, 1000).await {
+                    eprintln!("Error downloading contrib paths: {e}");
+                    return ExitCode::FAILURE;
                 }
             }
         },
@@ -51,26 +56,21 @@ async fn main() {
             numbered,
             files_only,
         } => {
-            if numbered && files_only {
-                eprintln!("Numbered and Files Only flags are incompatible");
-            } else {
-                let options = download::DownloadOptions {
-                    paths: &path_file,
-                    dst: &dst,
-                    progress,
-                    threads,
-                    max_retries: retries,
-                    numbered,
-                    files_only,
-                    ..Default::default()
-                };
-                match download::download(options).await {
-                    Ok(_) => (),
-                    Err(e) => {
-                        eprintln!("Error downloading paths: {e}");
-                    }
-                };
+            let options = download::DownloadOptions {
+                paths: &path_file,
+                dst: &dst,
+                progress,
+                threads,
+                max_retries: retries,
+                numbered,
+                files_only,
+                ..Default::default()
+            };
+            if let Err(e) = download::download(options).await {
+                eprintln!("Error downloading files: {e}");
+                return ExitCode::FAILURE;
             }
         }
     }
+    ExitCode::SUCCESS
 }

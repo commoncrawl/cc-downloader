@@ -8,7 +8,7 @@
     description = "Python bindings for the Common Crawl downloader"
     readme = "README.md"
     license = { text = "MIT OR Apache-2.0" }
-    dynamic = ["version"]                                           # pulls version from Cargo.toml automaticall
+    dynamic = ["version"]                                           # pulls version from Cargo.toml automatically
     dependencies = []
 
 [tool.maturin]
